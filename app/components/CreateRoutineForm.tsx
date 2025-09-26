@@ -20,8 +20,10 @@ export default function CreateRoutineForm() {
   const [selectedSession, setSelectedSession] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All');
   const [routineData, setRoutineData] = useState<RoutineClass[]>([]);
-  const [selectedHour, setSelectedHour] = useState('');
-  const [selectedMinute, setSelectedMinute] = useState('');
+  const [startHour, setStartHour] = useState('');
+  const [startMinute, setStartMinute] = useState('');
+  const [endHour, setEndHour] = useState('');
+  const [endMinute, setEndMinute] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
@@ -58,12 +60,9 @@ export default function CreateRoutineForm() {
     saturday: null
   });
 
-  const handleTimeSlotChange = (hour: number, minute: number) => {
-    const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-    const endMinute = minute + 5;
-    const endHour = endMinute >= 60 ? hour + 1 : hour;
-    const endMinuteFormatted = endMinute >= 60 ? endMinute - 60 : endMinute;
-    const endTime = `${endHour.toString().padStart(2, '0')}:${endMinuteFormatted.toString().padStart(2, '0')}`;
+  const handleTimeSlotChange = (startHour: number, startMinute: number, endHour: number, endMinute: number) => {
+    const startTime = `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`;
+    const endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
     const timeSlot = `${startTime} - ${endTime}`;
     
     const existingSlot = routineData.find(slot => slot.time === timeSlot);
@@ -133,8 +132,10 @@ export default function CreateRoutineForm() {
       setTitle('');
       setSelectedSession('');
       setSelectedDepartment('All');
-      setSelectedHour('');
-      setSelectedMinute('');
+      setStartHour('');
+      setStartMinute('');
+      setEndHour('');
+      setEndMinute('');
       setRoutineData([]);
       setMessage({ type: 'success', text: 'Routine created successfully!' });
     } catch (error: any) {
@@ -241,40 +242,66 @@ export default function CreateRoutineForm() {
         }, 'Add Time Slots'),
         React.createElement('div', {
           key: 'time-selectors',
-          className: 'flex space-x-4 items-end mb-4'
+          className: 'space-y-4 mb-4'
         }, [
-          // Hour Selector
+          // Start Time Section
           React.createElement('div', {
-            key: 'hour-selector'
+            key: 'start-time',
+            className: 'flex space-x-4 items-end'
           }, [
             React.createElement('label', {
-              key: 'hour-label',
+              key: 'start-label',
               className: 'block text-sm font-medium text-gray-700 mb-1'
-            }, 'Hour'),
+            }, 'Start Time'),
             React.createElement('select', {
-              key: 'hour-select',
-              value: selectedHour,
-              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => setSelectedHour(e.target.value),
+              key: 'start-hour',
+              value: startHour,
+              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => setStartHour(e.target.value),
               className: 'block w-20 rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
             }, [
               React.createElement('option', { key: 'empty', value: '' }, '--'),
               ...hours.map(hour => 
                 React.createElement('option', { key: hour, value: hour }, hour.toString().padStart(2, '0'))
               )
+            ]),
+            React.createElement('span', { key: 'colon1', className: 'text-gray-500' }, ':'),
+            React.createElement('select', {
+              key: 'start-minute',
+              value: startMinute,
+              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => setStartMinute(e.target.value),
+              className: 'block w-20 rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
+            }, [
+              React.createElement('option', { key: 'empty', value: '' }, '--'),
+              ...minutes.map(minute => 
+                React.createElement('option', { key: minute, value: minute }, minute.toString().padStart(2, '0'))
+              )
             ])
           ]),
-          // Minute Selector
+          // End Time Section
           React.createElement('div', {
-            key: 'minute-selector'
+            key: 'end-time',
+            className: 'flex space-x-4 items-end'
           }, [
             React.createElement('label', {
-              key: 'minute-label',
+              key: 'end-label',
               className: 'block text-sm font-medium text-gray-700 mb-1'
-            }, 'Minute'),
+            }, 'End Time'),
             React.createElement('select', {
-              key: 'minute-select',
-              value: selectedMinute,
-              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => setSelectedMinute(e.target.value),
+              key: 'end-hour',
+              value: endHour,
+              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => setEndHour(e.target.value),
+              className: 'block w-20 rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
+            }, [
+              React.createElement('option', { key: 'empty', value: '' }, '--'),
+              ...hours.map(hour => 
+                React.createElement('option', { key: hour, value: hour }, hour.toString().padStart(2, '0'))
+              )
+            ]),
+            React.createElement('span', { key: 'colon2', className: 'text-gray-500' }, ':'),
+            React.createElement('select', {
+              key: 'end-minute',
+              value: endMinute,
+              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => setEndMinute(e.target.value),
               className: 'block w-20 rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
             }, [
               React.createElement('option', { key: 'empty', value: '' }, '--'),
@@ -288,22 +315,34 @@ export default function CreateRoutineForm() {
             key: 'add-button',
             type: 'button',
             onClick: () => {
-              const hour = parseInt(selectedHour);
-              const minute = parseInt(selectedMinute);
+              const startH = parseInt(startHour);
+              const startM = parseInt(startMinute);
+              const endH = parseInt(endHour);
+              const endM = parseInt(endMinute);
               
-              if (!isNaN(hour) && !isNaN(minute)) {
-                handleTimeSlotChange(hour, minute);
-                setSelectedHour('');
-                setSelectedMinute('');
+              if (!isNaN(startH) && !isNaN(startM) && !isNaN(endH) && !isNaN(endM)) {
+                // Validate that end time is after start time
+                const startMinutes = startH * 60 + startM;
+                const endMinutes = endH * 60 + endM;
+                
+                if (endMinutes > startMinutes) {
+                  handleTimeSlotChange(startH, startM, endH, endM);
+                  setStartHour('');
+                  setStartMinute('');
+                  setEndHour('');
+                  setEndMinute('');
+                } else {
+                  setMessage({ type: 'error', text: 'End time must be after start time' });
+                }
               }
             },
-            disabled: !selectedHour || !selectedMinute,
+            disabled: !startHour || !startMinute || !endHour || !endMinute,
             className: `px-4 py-2 rounded-md transition-colors ${
-              selectedHour && selectedMinute
+              startHour && startMinute && endHour && endMinute
                 ? 'bg-blue-500 text-white hover:bg-blue-600'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`
-          }, 'Add Slot')
+          }, 'Add Time Slot')
         ]),
         // Selected Time Slots Display
         routineData.length > 0 && React.createElement('div', {
