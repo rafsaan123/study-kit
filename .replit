@@ -1,19 +1,26 @@
 run = "npm run dev"
 entrypoint = "index.js"
 modules = ["nodejs-20:v9-20231020-a3526c9"]
-hidden = [".config", "package-lock.json", ".next", ".swc"]
+hidden = [".config", "package-lock.json", ".next", ".swc", "node_modules"]
 
 [nix]
 channel = "stable-23_05"
 
 [env]
 NEXT_TELEMETRY_DISABLED = "1"
+NODE_ENV = "production"
+NEXTAUTH_URL = "https://$REPL_SLUG.$REPL_OWNER.repl.co"
+NEXTAUTH_SECRET = "your-nextauth-secret-key-change-this-in-production"
+MONGODB_URI = "mongodb://localhost:27017/study_aid"
 
 [deployment]
-build = ["npm", "run", "build"]
+build = ["npm", "ci", "&&", "npm", "run", "build"]
 run = ["npm", "run", "start"]
 deploymentTarget = "cloudrun"
 
 [[ports]]
 localPort = 3000
 externalPort = 80
+
+[agent]
+expertMode = true

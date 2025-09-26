@@ -1,0 +1,49 @@
+import mongoose from 'mongoose';
+
+const attachmentSchema = new mongoose.Schema({
+  fileName: {
+    type: String,
+    required: true
+  },
+  fileUrl: {
+    type: String,
+    required: true
+  },
+  fileType: {
+    type: String,
+    required: true
+  }
+}, { _id: false });
+
+const contentSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true
+  },
+  content: {
+    type: String,
+    required: function(this: any) {
+      return this.contentType !== 'routine';
+    }
+  },
+  contentType: {
+    type: String,
+    required: true,
+    enum: ['notice', 'assignment', 'routine', 'material']
+  },
+  targetSession: {
+    type: String,
+    required: true
+  },
+  attachments: [attachmentSchema],
+  createdBy: {
+    type: String,
+    required: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+export const Content = mongoose.models.Content || mongoose.model('Content', contentSchema);
