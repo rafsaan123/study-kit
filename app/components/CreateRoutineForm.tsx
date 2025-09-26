@@ -20,6 +20,8 @@ export default function CreateRoutineForm() {
   const [selectedSession, setSelectedSession] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All');
   const [routineData, setRoutineData] = useState<RoutineClass[]>([]);
+  const [selectedHour, setSelectedHour] = useState('');
+  const [selectedMinute, setSelectedMinute] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
@@ -39,26 +41,11 @@ export default function CreateRoutineForm() {
     'Geoinformatics Technology'
   ];
 
-  // Generate time slots in 5-minute intervals
-  const generateTimeSlots = () => {
-    const slots = [];
-    for (let hour = 8; hour <= 17; hour++) {
-      for (let minute = 0; minute < 60; minute += 5) {
-        const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        const endMinute = minute + 5;
-        const endHour = endMinute >= 60 ? hour + 1 : hour;
-        const endMinuteFormatted = endMinute >= 60 ? endMinute - 60 : endMinute;
-        const endTime = `${endHour.toString().padStart(2, '0')}:${endMinuteFormatted.toString().padStart(2, '0')}`;
-        
-        if (endHour <= 17) {
-          slots.push(`${startTime} - ${endTime}`);
-        }
-      }
-    }
-    return slots;
-  };
-
-  const timeSlots = generateTimeSlots();
+  // Generate hours (8 AM to 5 PM)
+  const hours = Array.from({ length: 10 }, (_, i) => i + 8);
+  
+  // Generate minutes in 5-minute intervals
+  const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
   const createEmptyTimeSlot = (time: string) => ({
     time,
@@ -71,7 +58,14 @@ export default function CreateRoutineForm() {
     saturday: null
   });
 
-  const handleTimeSlotChange = (timeSlot: string) => {
+  const handleTimeSlotChange = (hour: number, minute: number) => {
+    const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+    const endMinute = minute + 5;
+    const endHour = endMinute >= 60 ? hour + 1 : hour;
+    const endMinuteFormatted = endMinute >= 60 ? endMinute - 60 : endMinute;
+    const endTime = `${endHour.toString().padStart(2, '0')}:${endMinuteFormatted.toString().padStart(2, '0')}`;
+    const timeSlot = `${startTime} - ${endTime}`;
+    
     const existingSlot = routineData.find(slot => slot.time === timeSlot);
     if (existingSlot) {
       // Remove existing slot
@@ -139,6 +133,8 @@ export default function CreateRoutineForm() {
       setTitle('');
       setSelectedSession('');
       setSelectedDepartment('All');
+      setSelectedHour('');
+      setSelectedMinute('');
       setRoutineData([]);
       setMessage({ type: 'success', text: 'Routine created successfully!' });
     } catch (error: any) {
@@ -242,25 +238,103 @@ export default function CreateRoutineForm() {
         React.createElement('label', {
           key: 'label',
           className: 'block text-sm font-medium text-gray-700 mb-2'
-        }, 'Select Time Slots'),
+        }, 'Add Time Slots'),
         React.createElement('div', {
-          key: 'grid',
-          className: 'grid grid-cols-4 gap-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-3'
-        }, 
-          timeSlots.map(timeSlot => {
-            const isSelected = routineData.some(slot => slot.time === timeSlot);
-            return React.createElement('button', {
-              key: timeSlot,
-              type: 'button',
-              onClick: () => handleTimeSlotChange(timeSlot),
-              className: `px-3 py-2 text-sm rounded border ${
-                isSelected 
-                  ? 'bg-blue-500 text-white border-blue-500' 
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`
-            }, timeSlot);
-          })
-        )
+          key: 'time-selectors',
+          className: 'flex space-x-4 items-end mb-4'
+        }, [
+          // Hour Selector
+          React.createElement('div', {
+            key: 'hour-selector'
+          }, [
+            React.createElement('label', {
+              key: 'hour-label',
+              className: 'block text-sm font-medium text-gray-700 mb-1'
+            }, 'Hour'),
+            React.createElement('select', {
+              key: 'hour-select',
+              value: selectedHour,
+              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => setSelectedHour(e.target.value),
+              className: 'block w-20 rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
+            }, [
+              React.createElement('option', { key: 'empty', value: '' }, '--'),
+              ...hours.map(hour => 
+                React.createElement('option', { key: hour, value: hour }, hour.toString().padStart(2, '0'))
+              )
+            ])
+          ]),
+          // Minute Selector
+          React.createElement('div', {
+            key: 'minute-selector'
+          }, [
+            React.createElement('label', {
+              key: 'minute-label',
+              className: 'block text-sm font-medium text-gray-700 mb-1'
+            }, 'Minute'),
+            React.createElement('select', {
+              key: 'minute-select',
+              value: selectedMinute,
+              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => setSelectedMinute(e.target.value),
+              className: 'block w-20 rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
+            }, [
+              React.createElement('option', { key: 'empty', value: '' }, '--'),
+              ...minutes.map(minute => 
+                React.createElement('option', { key: minute, value: minute }, minute.toString().padStart(2, '0'))
+              )
+            ])
+          ]),
+          // Add Button
+          React.createElement('button', {
+            key: 'add-button',
+            type: 'button',
+            onClick: () => {
+              const hour = parseInt(selectedHour);
+              const minute = parseInt(selectedMinute);
+              
+              if (!isNaN(hour) && !isNaN(minute)) {
+                handleTimeSlotChange(hour, minute);
+                setSelectedHour('');
+                setSelectedMinute('');
+              }
+            },
+            disabled: !selectedHour || !selectedMinute,
+            className: `px-4 py-2 rounded-md transition-colors ${
+              selectedHour && selectedMinute
+                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`
+          }, 'Add Slot')
+        ]),
+        // Selected Time Slots Display
+        routineData.length > 0 && React.createElement('div', {
+          key: 'selected-slots'
+        }, [
+          React.createElement('label', {
+            key: 'selected-label',
+            className: 'block text-sm font-medium text-gray-700 mb-2'
+          }, 'Selected Time Slots'),
+          React.createElement('div', {
+            key: 'selected-grid',
+            className: 'flex flex-wrap gap-2'
+          }, 
+            routineData.map((slot, index) => 
+              React.createElement('div', {
+                key: index,
+                className: 'flex items-center space-x-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-md'
+              }, [
+                React.createElement('span', { key: 'time' }, slot.time),
+                React.createElement('button', {
+                  key: 'remove',
+                  type: 'button',
+                  onClick: () => {
+                    setRoutineData(routineData.filter((_, i) => i !== index));
+                  },
+                  className: 'text-blue-600 hover:text-blue-800 ml-1'
+                }, '×')
+              ])
+            )
+          )
+        ])
       ]),
 
       // Routine Table
