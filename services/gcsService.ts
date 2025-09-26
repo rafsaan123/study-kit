@@ -2,11 +2,18 @@ import { Storage } from '@google-cloud/storage';
 import path from 'path';
 import { GCS_CONFIG } from '../config/gcs.config';
 
-// Initialize Google Cloud Storage
+// Initialize Google Cloud Storage with Vercel-compatible settings
 const storage = new Storage({
   projectId: GCS_CONFIG.projectId,
   // Use credentials from environment variable if available (for Vercel)
   ...(GCS_CONFIG.credentials ? { credentials: GCS_CONFIG.credentials } : { keyFilename: GCS_CONFIG.keyFilename }),
+  // Vercel-specific configuration to avoid AbortSignal issues
+  retryOptions: {
+    autoRetry: true,
+    maxRetries: 3,
+    retryDelayMultiplier: 2,
+    totalTimeout: 60000,
+  },
 });
 
 const bucketName = GCS_CONFIG.bucketName;
@@ -43,7 +50,7 @@ export class GCSService {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
-      // Upload to GCS
+      // Upload to GCS with Vercel-compatible settings
       await gcsFile.save(buffer, {
         metadata: {
           contentType: file.type,
@@ -52,6 +59,10 @@ export class GCSService {
             uploadedAt: new Date().toISOString(),
           },
         },
+        // Vercel-specific upload options
+        resumable: false, // Disable resumable uploads to avoid AbortSignal issues
+        validation: false, // Skip validation to improve performance
+        timeout: 30000, // 30 second timeout
       });
 
       // Make file publicly accessible
@@ -68,6 +79,20 @@ export class GCSService {
       };
     } catch (error) {
       console.error('GCS upload error:', error);
+      
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('AbortSignal')) {
+          throw new Error('Upload failed due to serverless environment compatibility. Please try again.');
+        }
+        if (error.message.includes('timeout')) {
+          throw new Error('Upload timed out. Please try with a smaller file.');
+        }
+        if (error.message.includes('permission')) {
+          throw new Error('Permission denied. Please check your service account configuration.');
+        }
+      }
+      
       throw new Error('Failed to upload file to Google Cloud Storage');
     }
   }
@@ -140,12 +165,19 @@ export class GCSService {
         await bucket.create({
           location: 'US',
           storageClass: 'STANDARD',
+          // Vercel-compatible bucket settings
+          uniformBucketLevelAccess: true,
+          publicAccessPrevention: 'inherited',
         });
         console.log(`Bucket ${bucketName} created successfully`);
       }
     } catch (error) {
       console.error('Bucket creation error:', error);
-      throw new Error('Failed to create bucket');
+      // Don't throw error for bucket creation in production
+      // The bucket might already exist or be managed externally
+      if (process.env.NODE_ENV === 'development') {
+        throw new Error('Failed to create bucket');
+      }
     }
   }
 }
