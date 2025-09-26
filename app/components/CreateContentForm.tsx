@@ -56,6 +56,7 @@ export default function CreateContentForm() {
         attachments.forEach(file => {
           uploadFormData.append('files', file);
         });
+        uploadFormData.append('folder', 'content-attachments');
 
         const uploadResponse = await fetch('/api/upload', {
           method: 'POST',
@@ -63,7 +64,8 @@ export default function CreateContentForm() {
         });
 
         if (!uploadResponse.ok) {
-          throw new Error('File upload failed');
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.error || 'File upload failed');
         }
 
         const uploadResult = await uploadResponse.json();

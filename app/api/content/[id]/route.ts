@@ -3,6 +3,7 @@ import { connectDB } from '../../../lib/mongodb';
 import { Content } from '../../../models/Content';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/options';
+import { GCSService } from '../../../../services/gcsService';
 
 export async function DELETE(
   req: Request,
@@ -19,7 +20,7 @@ export async function DELETE(
     }
 
     await connectDB();
-    const content = await Content.findByIdAndDelete(params.id);
+    const content = await Content.findById(params.id);
 
     if (!content) {
       return NextResponse.json(
@@ -27,6 +28,23 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    // Delete associated files from GCS
+    if (content.attachments && content.attachments.length > 0) {
+      for (const attachment of content.attachments) {
+        if (attachment.gcsPath) {
+          try {
+            await GCSService.deleteFile(attachment.gcsPath);
+          } catch (error) {
+            console.error('Error deleting GCS file:', error);
+            // Continue with content deletion even if file deletion fails
+          }
+        }
+      }
+    }
+
+    // Delete the content from database
+    await Content.findByIdAndDelete(params.id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

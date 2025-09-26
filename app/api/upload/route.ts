@@ -1,16 +1,24 @@
 import { NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/options';
+import { GCSService } from '../../../services/gcsService';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
     const formData = await req.formData();
     const files = formData.getAll('files');
+    const folder = formData.get('folder') as string || 'uploads';
 
     if (!files || files.length === 0) {
       return NextResponse.json(
@@ -19,46 +27,22 @@ export async function POST(req: Request) {
       );
     }
 
-    const uploadDir = join(process.cwd(), 'public', 'uploads');
+    // Filter valid files
+    const validFiles = files.filter(file => file instanceof File) as File[];
 
-    // Create uploads directory if it doesn't exist
-    try {
-      await mkdir(uploadDir, { recursive: true });
-    } catch (error) {
-      console.error('Error creating upload directory:', error);
+    if (validFiles.length === 0) {
+      return NextResponse.json(
+        { error: 'No valid files provided' },
+        { status: 400 }
+      );
     }
 
-    const savedFiles = [];
-
-    for (const file of files) {
-      if (!(file instanceof File)) {
-        continue;
-      }
-
-      // Generate unique filename
-      const timestamp = Date.now();
-      const randomString = Math.random().toString(36).substring(2, 15);
-      const fileName = `${timestamp}-${randomString}-${file.name}`;
-      const filePath = join(uploadDir, fileName);
-
-      // Get file buffer
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-
-      // Save file
-      await writeFile(filePath, buffer);
-
-      // Store file info
-      savedFiles.push({
-        fileName: file.name,
-        fileUrl: `/uploads/${fileName}`,
-        fileType: file.type
-      });
-    }
+    // Upload files to Google Cloud Storage
+    const uploadResults = await GCSService.uploadFiles(validFiles, folder);
 
     return NextResponse.json({ 
       success: true, 
-      files: savedFiles 
+      files: uploadResults 
     });
   } catch (error) {
     console.error('Upload error:', error);

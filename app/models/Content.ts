@@ -12,6 +12,10 @@ const attachmentSchema = new mongoose.Schema({
   fileType: {
     type: String,
     required: true
+  },
+  gcsPath: {
+    type: String,
+    required: false // For backward compatibility
   }
 }, { _id: false });
 

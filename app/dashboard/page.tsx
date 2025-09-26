@@ -117,23 +117,38 @@ export default function StudentDashboard() {
     }));
 
     try {
-      const response = await fetch(attachment.fileUrl);
-      if (!response.ok) throw new Error('Download failed');
+      // Check if it's a GCS URL
+      if (attachment.fileUrl.includes('storage.googleapis.com')) {
+        // For GCS files, use the download API to get a signed URL
+        const downloadUrl = `/api/download?fileUrl=${encodeURIComponent(attachment.fileUrl)}&originalName=${encodeURIComponent(attachment.fileName)}`;
+        
+        // Open in new tab for GCS files
+        window.open(downloadUrl, '_blank');
+        
+        setDownloadStates(prev => ({
+          ...prev,
+          [downloadKey]: { isLoading: false, error: null }
+        }));
+      } else {
+        // Legacy local file download
+        const response = await fetch(attachment.fileUrl);
+        if (!response.ok) throw new Error('Download failed');
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', attachment.fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', attachment.fileName);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
 
-      setDownloadStates(prev => ({
-        ...prev,
-        [downloadKey]: { isLoading: false, error: null }
-      }));
+        setDownloadStates(prev => ({
+          ...prev,
+          [downloadKey]: { isLoading: false, error: null }
+        }));
+      }
     } catch (error) {
       console.error('Download error:', error);
       setDownloadStates(prev => ({

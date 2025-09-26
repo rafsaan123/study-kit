@@ -48,6 +48,23 @@ export async function POST(req: Request) {
       contentData.routineData = [];
     }
 
+    // Handle attachments
+    const attachmentsStr = formData.get('attachments') as string;
+    if (attachmentsStr) {
+      try {
+        contentData.attachments = JSON.parse(attachmentsStr);
+        console.log('Parsed Attachments:', contentData.attachments);
+      } catch (error) {
+        console.error("Error parsing attachments:", error);
+        return NextResponse.json(
+          { error: 'Invalid attachments format' },
+          { status: 400 }
+        );
+      }
+    } else {
+      contentData.attachments = [];
+    }
+
     console.log("Creating content with data:", contentData);
     const newContent = await Content.create(contentData);
     console.log("Created content:", newContent);

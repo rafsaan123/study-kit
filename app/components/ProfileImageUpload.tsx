@@ -33,7 +33,8 @@ export default function ProfileImageUpload({ currentImage, onUpload }: ProfileIm
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('files', file);
+      formData.append('folder', 'profile-images');
 
       const response = await fetch('/api/upload', {
         method: 'POST',
@@ -41,11 +42,16 @@ export default function ProfileImageUpload({ currentImage, onUpload }: ProfileIm
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload image');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload image');
       }
 
       const data = await response.json();
-      onUpload(data.files[0].fileUrl);
+      if (data.files && data.files.length > 0) {
+        onUpload(data.files[0].fileUrl);
+      } else {
+        throw new Error('No file URL returned');
+      }
     } catch (error) {
       setError('Failed to upload image. Please try again.');
     } finally {
