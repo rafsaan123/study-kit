@@ -13,7 +13,8 @@ export default function CreateStudentForm() {
   const [department, setDepartment] = useState('Survey Technology');
   const departments = [
     'Survey Technology',
-    'Cadastral Topography And Land Information Technology'
+    'Cadastral Topography And Land Information Technology',
+    'Geoinformatics Technology'
   ];
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });

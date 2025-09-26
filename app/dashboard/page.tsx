@@ -35,6 +35,7 @@ interface ContentItem {
   content: string;
   contentType: string;
   targetSession: string;
+  targetDepartment: string;
   routineData?: RoutineData[];
   attachments: Attachment[];
   createdAt: string;

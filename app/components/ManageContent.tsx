@@ -7,6 +7,7 @@ interface Content {
   title: string;
   contentType: string;
   targetSession: string;
+  targetDepartment: string;
   content?: string;
   routineData?: any[];
   createdAt: string;
@@ -16,16 +17,22 @@ export default function ManageContent() {
   const [contents, setContents] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeType, setActiveType] = useState('all');
+  const [activeDepartment, setActiveDepartment] = useState('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     title: '',
     content: '',
-    targetSession: ''
+    targetSession: '',
+    targetDepartment: ''
   });
 
   const fetchContents = useCallback(async () => {
     try {
-      const query = activeType !== 'all' ? `?type=${activeType}` : '';
+      const params = new URLSearchParams();
+      if (activeType !== 'all') params.append('type', activeType);
+      if (activeDepartment !== 'all') params.append('department', activeDepartment);
+      
+      const query = params.toString() ? `?${params.toString()}` : '';
       const response = await fetch(`/api/content${query}`);
       if (response.ok) {
         const data = await response.json();
@@ -36,7 +43,7 @@ export default function ManageContent() {
     } finally {
       setLoading(false);
     }
-  }, [activeType]);
+  }, [activeType, activeDepartment]);
 
   useEffect(() => {
     fetchContents();
@@ -64,7 +71,8 @@ export default function ManageContent() {
       setEditForm({
         title: content.title,
         content: content.content || '',
-        targetSession: content.targetSession
+        targetSession: content.targetSession,
+        targetDepartment: content.targetDepartment
       });
       setEditingId(id);
     }
@@ -92,23 +100,53 @@ export default function ManageContent() {
     }
   };
 
+  const departments = [
+    'all',
+    'Survey Technology',
+    'Cadastral Topography And Land Information Technology',
+    'Geoinformatics Technology'
+  ];
+
   return React.createElement('div', { className: 'space-y-6' }, [
     // Filter buttons
     React.createElement('div', { 
       key: 'filters',
-      className: 'flex space-x-4 mb-4' 
+      className: 'space-y-4 mb-4' 
     }, [
-      ['all', 'notice', 'assignment', 'routine', 'material'].map(type =>
-        React.createElement('button', {
-          key: type,
-          onClick: () => setActiveType(type),
-          className: `px-4 py-2 rounded ${
-            activeType === type
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-200 hover:bg-gray-300'
-          }`
-        }, type.charAt(0).toUpperCase() + type.slice(1))
-      )
+      // Content type filters
+      React.createElement('div', {
+        key: 'type-filters',
+        className: 'flex space-x-4'
+      }, [
+        ['all', 'notice', 'assignment', 'routine', 'material'].map(type =>
+          React.createElement('button', {
+            key: type,
+            onClick: () => setActiveType(type),
+            className: `px-4 py-2 rounded ${
+              activeType === type
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 hover:bg-gray-300'
+            }`
+          }, type.charAt(0).toUpperCase() + type.slice(1))
+        )
+      ]),
+      // Department filters
+      React.createElement('div', {
+        key: 'department-filters',
+        className: 'flex space-x-4'
+      }, [
+        departments.map(dept =>
+          React.createElement('button', {
+            key: dept,
+            onClick: () => setActiveDepartment(dept),
+            className: `px-4 py-2 rounded text-sm ${
+              activeDepartment === dept
+                ? 'bg-green-500 text-white'
+                : 'bg-gray-200 hover:bg-gray-300'
+            }`
+          }, dept === 'all' ? 'All Departments' : dept)
+        )
+      ])
     ]),
 
     // Content list

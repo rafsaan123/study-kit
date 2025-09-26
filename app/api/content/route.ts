@@ -23,6 +23,7 @@ export async function POST(req: Request) {
       title: formData.get('title'),
       contentType: formData.get('contentType'),
       targetSession: formData.get('targetSession') || 'All',
+      targetDepartment: formData.get('targetDepartment') || 'All',
       createdBy: session.user.email
     };
 
@@ -98,16 +99,31 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const contentType = searchParams.get('type');
+    const department = searchParams.get('department');
     const query: any = {};
 
     if (contentType && contentType !== 'all') {
       query.contentType = contentType;
     }
 
+    if (department && department !== 'all') {
+      query.targetDepartment = department;
+    }
+
     if (session.user.userType === 'student') {
-      query.$or = [
-        { targetSession: session.user.session },
-        { targetSession: 'All' }
+      query.$and = [
+        {
+          $or: [
+            { targetSession: session.user.session },
+            { targetSession: 'All' }
+          ]
+        },
+        {
+          $or: [
+            { targetDepartment: session.user.department },
+            { targetDepartment: 'All' }
+          ]
+        }
       ];
     }
 

@@ -14,6 +14,7 @@ export default function CreateContentForm() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [selectedSession, setSelectedSession] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('All');
   const [contentType, setContentType] = useState('notice');
   const [routineData, setRoutineData] = useState([]);
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -27,6 +28,13 @@ export default function CreateContentForm() {
     `${currentYear-1}-${currentYear.toString().slice(-2)}`,
     `${currentYear-2}-${(currentYear-1).toString().slice(-2)}`,
     `${currentYear-3}-${(currentYear-2).toString().slice(-2)}`
+  ];
+
+  const departments = [
+    'All',
+    'Survey Technology',
+    'Cadastral Topography And Land Information Technology',
+    'Geoinformatics Technology'
   ];
 
   const handleFileSelect = (files: FileList | null) => {
@@ -77,6 +85,7 @@ export default function CreateContentForm() {
       contentFormData.append('title', title);
       contentFormData.append('contentType', contentType);
       contentFormData.append('targetSession', selectedSession);
+      contentFormData.append('targetDepartment', selectedDepartment);
 
       if (contentType === 'routine') {
         contentFormData.append('routineData', JSON.stringify(routineData));
@@ -101,6 +110,7 @@ export default function CreateContentForm() {
       setTitle('');
       setContent('');
       setSelectedSession('');
+      setSelectedDepartment('All');
       setAttachments([]);
       setMessage({ type: 'success', text: 'Content created successfully!' });
     } catch (error: any) {
@@ -160,6 +170,26 @@ export default function CreateContentForm() {
             {sessions.map(session => (
               <option key={session} value={session}>
                 {session}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Department Select */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Department
+          </label>
+          <select
+            value={selectedDepartment}
+            onChange={(e) => setSelectedDepartment(e.target.value)}
+            className="mt-1 block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            required
+            disabled={isLoading}
+          >
+            {departments.map(dept => (
+              <option key={dept} value={dept}>
+                {dept}
               </option>
             ))}
           </select>
