@@ -5,7 +5,8 @@ import { GCS_CONFIG } from '../config/gcs.config';
 // Initialize Google Cloud Storage
 const storage = new Storage({
   projectId: GCS_CONFIG.projectId,
-  keyFilename: path.join(process.cwd(), GCS_CONFIG.keyFilename),
+  // Use credentials from environment variable if available (for Vercel)
+  ...(GCS_CONFIG.credentials ? { credentials: GCS_CONFIG.credentials } : { keyFilename: GCS_CONFIG.keyFilename }),
 });
 
 const bucketName = GCS_CONFIG.bucketName;
