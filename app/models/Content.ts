@@ -45,6 +45,11 @@ const contentSchema = new mongoose.Schema({
     enum: ['Survey Technology', 'Cadastral Topography And Land Information Technology', 'Geoinformatics Technology', 'All'],
     default: 'All'
   },
+  routineData: {
+    type: [mongoose.Schema.Types.Mixed],
+    required: false,
+    default: []
+  },
   attachments: [attachmentSchema],
   createdBy: {
     type: String,

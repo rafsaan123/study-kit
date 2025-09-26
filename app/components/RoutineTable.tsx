@@ -81,6 +81,7 @@ export default function RoutineTable({ isEditing = false, initialData = [], onDa
     // Add Time Slot Button
     isEditing && React.createElement('button', {
       key: 'add-slot',
+      type: 'button',
       onClick: addTimeSlot,
       className: 'mb-4 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors'
     }, '+ Add Time Slot'),
@@ -184,6 +185,7 @@ export default function RoutineTable({ isEditing = false, initialData = [], onDa
                 className: 'px-6 py-4 border-b border-gray-200'
               },
                 routineData.length > 1 && React.createElement('button', {
+                  type: 'button',
                   onClick: () => removeTimeSlot(rowIndex),
                   className: 'text-red-600 hover:text-red-800'
                 }, '🗑️')
