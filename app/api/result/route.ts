@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { PookieApiService } from '../../../services/pookieApiService';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   try {
     // Temporarily bypass authentication for testing

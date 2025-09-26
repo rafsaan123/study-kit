@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import NavBar from '../components/NavBar';
@@ -81,10 +81,15 @@ export default function StudentDashboard() {
     };
 
     fetchContent();
-  }, [activeType, session]);
+  }, [activeType, session, router]);
+
+  useEffect(() => {
+    if (!session || session.user.userType !== 'student') {
+      router.push('/auth/login');
+    }
+  }, [session, router]);
 
   if (!session || session.user.userType !== 'student') {
-    router.push('/auth/login');
     return null;
   }
 

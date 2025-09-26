@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
 import ProfileImageUpload from '../components/ProfileImageUpload';
@@ -31,16 +31,7 @@ export default function ProfilePage() {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [showPasswordChange, setShowPasswordChange] = useState(false);
 
-  useEffect(() => {
-    if (session?.user) {
-      console.log('Session exists, fetching profile');
-      fetchProfile();
-    } else {
-      console.log('No session yet');
-    }
-  }, [session]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       console.log('Fetching profile for user:', session?.user);
       const response = await fetch('/api/student/profile');
@@ -59,7 +50,16 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [session]);
+
+  useEffect(() => {
+    if (session?.user) {
+      console.log('Session exists, fetching profile');
+      fetchProfile();
+    } else {
+      console.log('No session yet');
+    }
+  }, [session, fetchProfile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

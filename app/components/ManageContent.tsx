@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 interface Content {
   _id: string;
@@ -23,11 +23,7 @@ export default function ManageContent() {
     targetSession: ''
   });
 
-  useEffect(() => {
-    fetchContents();
-  }, [activeType]);
-
-  const fetchContents = async () => {
+  const fetchContents = useCallback(async () => {
     try {
       const query = activeType !== 'all' ? `?type=${activeType}` : '';
       const response = await fetch(`/api/content${query}`);
@@ -40,7 +36,11 @@ export default function ManageContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeType]);
+
+  useEffect(() => {
+    fetchContents();
+  }, [fetchContents]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this content?')) return;
