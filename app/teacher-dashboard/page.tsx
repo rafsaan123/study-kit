@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import CreateContentForm from '../components/CreateContentForm';
 import CreateStudentForm from '../components/CreateStudentForm';
+import CreateRoutineForm from '../components/CreateRoutineForm';
 import NavBar from '../components/NavBar';
 import ManageContent from '../components/ManageContent';
 
@@ -39,7 +40,7 @@ export default function TeacherDashboard() {
             React.createElement('button', {
               key: 'create-content',
               onClick: () => setActiveTab('content'),
-              className: `w-1/3 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+              className: `w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm ${
                 activeTab === 'content'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -49,9 +50,21 @@ export default function TeacherDashboard() {
               'Create Content'
             ]),
             React.createElement('button', {
+              key: 'create-routine',
+              onClick: () => setActiveTab('routine'),
+              className: `w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+                activeTab === 'routine'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`
+            }, [
+              React.createElement('span', { key: 'icon', className: 'mr-2' }, '📅'),
+              'Create Routine'
+            ]),
+            React.createElement('button', {
               key: 'manage-content',
               onClick: () => setActiveTab('manage'),
-              className: `w-1/3 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+              className: `w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm ${
                 activeTab === 'manage'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -63,7 +76,7 @@ export default function TeacherDashboard() {
             React.createElement('button', {
               key: 'students',
               onClick: () => setActiveTab('students'),
-              className: `w-1/3 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+              className: `w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm ${
                 activeTab === 'students'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -82,6 +95,7 @@ export default function TeacherDashboard() {
         className: 'bg-white rounded-lg shadow p-6'
       }, 
         activeTab === 'content' ? React.createElement(CreateContentForm) :
+        activeTab === 'routine' ? React.createElement(CreateRoutineForm) :
         activeTab === 'manage' ? React.createElement(ManageContent) :
         React.createElement(CreateStudentForm)
       )
