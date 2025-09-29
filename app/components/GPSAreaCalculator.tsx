@@ -34,6 +34,7 @@ const GPSAreaCalculator = () => {
   const [mapCenter, setMapCenter] = useState({ lat: 23.7806, lng: 90.4392 }); // Dhaka coordinates
   const [mapZoom, setMapZoom] = useState(15);
   const [showDecimalCoords, setShowDecimalCoords] = useState(false);
+  const [autoParseMode, setAutoParseMode] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
 
   // Google Earth/Maps tile servers for accurate coordinate matching
@@ -128,6 +129,54 @@ const GPSAreaCalculator = () => {
     }
   };
 
+  // Auto-parse multiple coordinates from pasted text
+  const autoParseMultipleCoordinates = (text: string): string[] => {
+    try {
+      // Split by common delimiters (newlines, semicolons, tabs, commas)
+      const lines = text.split(/[\n;,\t]+/).map(line => line.trim()).filter(line => line.length > 0);
+      
+      const coordinates: string[] = [];
+      
+      lines.forEach(line => {
+        // Look for DMS pattern: degrees°minutes'seconds"direction degrees°minutes'seconds"direction
+        const gpsMatch = line.match(/(\d+)°(\d+)'([\d.]+)"([NS])\s+(\d+)°(\d+)'([\d.]+)"([EW])/);
+        if (gpsMatch) {
+          const coordinate = line.substring(gpsMatch.index!, gpsMatch.index! + gpsMatch[0].length);
+          coordinates.push(coordinate);
+        }
+      });
+      
+      return coordinates;
+    } catch (err) {
+      console.error('Auto-parse error:', err);
+      return [];
+    }
+  };
+
+  // Handle paste event for automatic coordinate parsing
+  const handleGPSCoordinatePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (!autoParseMode) return;
+    
+    const pastedText = e.clipboardData.getData('text');
+    const parsedCoords = autoParseMultipleCoordinates(pastedText);
+    
+    if (parsedCoords.length > 0) {
+      e.preventDefault(); // Prevent default paste
+      
+      // Add all parsed coordinates at once
+      setGpsCoordinates(prev => {
+        const newCoords = [...prev];
+        parsedCoords.forEach(coord => {
+          if (!newCoords.includes(coord)) {
+            newCoords.push(coord);
+          }
+        });
+        return newCoords;
+      });
+      
+      alert(`Found and added ${parsedCoords.length} coordinates automatically!`);
+    }
+  };
 
   // Convert GPS coordinates to meters using simplified Mercator projection
   const gpsToMeters = (coords: GPSCoordinate[]): Coordinate[] => {
@@ -642,13 +691,41 @@ const GPSAreaCalculator = () => {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-700">GPS Coordinate Input</h3>
-            <button
-              onClick={addGpsCoordinate}
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-            >
-              Add GPS Coordinate
-            </button>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setAutoParseMode(!autoParseMode)}
+                className={`px-3 py-2 rounded-md transition-colors text-sm ${
+                  autoParseMode 
+                    ? 'bg-green-500 text-white hover:bg-green-600' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {autoParseMode ? '✓ Auto-Parse On' : 'Auto-Parse Off'}
+              </button>
+              <button
+                onClick={addGpsCoordinate}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+              >
+                Add GPS Coordinate
+              </button>
+            </div>
           </div>
+
+          {autoParseMode && (
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <h4 className="text-sm font-semibold text-green-800 mb-2">📋 Paste Multiple Coordinates</h4>
+              <textarea
+                placeholder="Paste multiple GPS coordinates here...&#10;&#10;Example:&#10;24°24'10.5&quot;N 88°37'34.7&quot;E&#10;24°24'11.9&quot;N 88°37'35.0&quot;E&#10;24°24'11.8&quot;N 88°37'36.1&quot;E"
+                onPaste={handleGPSCoordinatePaste}
+                className="w-full px-3 py-2 border border-green-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm resize-none"
+                rows={8}
+              />
+              <p className="text-xs text-green-600 mt-2">
+                💡 Paste coordinates separated by new lines, semicolons, commas, or tabs. 
+                Auto-parsing will detect DMS format and add coordinates automatically.
+              </p>
+            </div>
+          )}
 
           {gpsCoordinates.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
