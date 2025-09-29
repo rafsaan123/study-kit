@@ -86,7 +86,7 @@ const GPSAreaCalculator = () => {
       existingScripts.forEach(script => script.remove());
 
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry,marker&callback=initGoogleMap`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry,marker&loading=async&callback=initGoogleMap`;
       script.async = true;
       script.defer = true;
       
@@ -115,6 +115,7 @@ const GPSAreaCalculator = () => {
           center: mapCenter,
           zoom: mapZoom,
           mapTypeId: mapView === 'satellite' ? 'satellite' : mapView === 'terrain' ? 'terrain' : 'roadmap',
+          mapId: 'DEMO_MAP_ID', // Required for Advanced Markers
           disableDefaultUI: false,
           zoomControl: true,
           mapTypeControl: true,
@@ -149,15 +150,37 @@ const GPSAreaCalculator = () => {
         // Add new markers using AdvancedMarkerElement (recommended)
         const newMarkers: any[] = [];
         parsedCoords.forEach((coord, index) => {
-          // Try to use AdvancedMarkerElement if available, fallback to regular Marker
-          if (window.google.maps.marker && window.google.maps.marker.AdvancedMarkerElement) {
-            const marker = new window.google.maps.marker.AdvancedMarkerElement({
-              position: { lat: coord.lat, lng: coord.lng },
-              map: googleMap,
-              title: `Point ${index + 1}: ${coord.lat.toFixed(6)}°N, ${coord.lng.toFixed(6)}°E`,
-              content: createMarkerContent(index + 1)
-            });
-            newMarkers.push(marker);
+          // Try to use AdvancedMarkerElement if available and map has Map ID
+          if (window.google.maps.marker && 
+              window.google.maps.marker.AdvancedMarkerElement && 
+              googleMap.mapId) {
+            try {
+              const marker = new window.google.maps.marker.AdvancedMarkerElement({
+                position: { lat: coord.lat, lng: coord.lng },
+                map: googleMap,
+                title: `Point ${index + 1}: ${coord.lat.toFixed(6)}°N, ${coord.lng.toFixed(6)}°E`,
+                content: createMarkerContent(index + 1)
+              });
+              newMarkers.push(marker);
+            } catch (err) {
+              console.warn('AdvancedMarkerElement failed, using regular Marker:', err);
+              // Fallback to regular Marker
+              const marker = new window.google.maps.Marker({
+                position: { lat: coord.lat, lng: coord.lng },
+                map: googleMap,
+                title: `Point ${index + 1}: ${coord.lat.toFixed(6)}°N, ${coord.lng.toFixed(6)}°E`,
+                label: `${index + 1}`,
+                icon: {
+                  path: window.google.maps.SymbolPath.CIRCLE,
+                  scale: 8,
+                  fillColor: '#ef4444',
+                  fillOpacity: 0.9,
+                  strokeColor: '#ffffff',
+                  strokeWeight: 3
+                }
+              });
+              newMarkers.push(marker);
+            }
           } else {
             // Fallback to regular Marker
             const marker = new window.google.maps.Marker({
