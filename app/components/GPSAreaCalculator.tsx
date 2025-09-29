@@ -33,6 +33,7 @@ const GPSAreaCalculator = () => {
   const [mapView, setMapView] = useState<'standard' | 'satellite' | 'terrain'>('standard');
   const [mapCenter, setMapCenter] = useState({ lat: 23.7806, lng: 90.4392 }); // Dhaka coordinates
   const [mapZoom, setMapZoom] = useState(15);
+  const [showDecimalCoords, setShowDecimalCoords] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
 
   // Real tile server URLs for different map types (using reliable sources)
@@ -844,6 +845,16 @@ const GPSAreaCalculator = () => {
                     </button>
                   </div>
                   <button
+                    onClick={() => setShowDecimalCoords(!showDecimalCoords)}
+                    className={`px-3 py-1 rounded-md transition-colors text-xs ${
+                      showDecimalCoords 
+                        ? 'bg-purple-100 text-purple-600 hover:bg-purple-200' 
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {showDecimalCoords ? 'Show DMS' : 'Show Decimal'}
+                  </button>
+                  <button
                     onClick={() => setShowMap(!showMap)}
                     className={`px-4 py-2 rounded-md transition-colors text-sm ${
                       showMap 
@@ -962,22 +973,17 @@ const GPSAreaCalculator = () => {
                               >
                                 {index + 1}
                               </text>
-                              {/* Coordinate values */}
+                              {/* Coordinate values - show format based on toggle */}
                               <text
                                 x={point.x + 8}
                                 y={point.y + 4}
-                                fontSize="8"
+                                fontSize="6"
                                 fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(107, 114, 128, 0.7)'}
                               >
-                                {parsedCoords[index].lat.toFixed(8)}°N
-                              </text>
-                              <text
-                                x={point.x + 8}
-                                y={point.y + 12}
-                                fontSize="8"
-                                fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(107, 114, 128, 0.7)'}
-                              >
-                                {parsedCoords[index].lng.toFixed(8)}°E
+                                {showDecimalCoords ? 
+                                  `${parsedCoords[index].lat.toFixed(8)}°, ${parsedCoords[index].lng.toFixed(8)}°` :
+                                  gpsCoordinates[index].substring(0, 20) + (gpsCoordinates[index].length > 20 ? '...' : '')
+                                }
                               </text>
                             </g>
                           ));
@@ -1007,14 +1013,14 @@ const GPSAreaCalculator = () => {
                           <div key={index} className="flex justify-between items-center py-1">
                             <span className="font-mono text-xs">{coord}</span>
                             <span className="text-xs text-gray-400 ml-2">
-                              {(() => {
+                              {showDecimalCoords ? (() => {
                                 try {
                                   const parsed = parseGPSCoordinate(coord);
                                   return `${parsed.lat.toFixed(8)}°, ${parsed.lng.toFixed(8)}°`;
                                 } catch (err) {
                                   return 'Invalid';
                                 }
-                              })()}
+                              })() : 'Original DMS format'}
                             </span>
                           </div>
                         ))}
