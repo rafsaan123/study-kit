@@ -1007,118 +1007,44 @@ const GPSAreaCalculator = () => {
                   </div>
                   
                   <div className="relative" style={{ height: '400px', backgroundColor: '#f8f9fa' }}>
-                    {/* Real Map Tile */}
-                    <div 
-                      className="absolute inset-0 w-full h-full"
-                      style={{
-                        backgroundImage: `url(${(() => {
-                          const centerTile = getTileCoords(mapCenter.lat, mapCenter.lng, mapZoom);
-                          let tileUrl = tileServers[mapView];
-                          // For single tile display, show center tile
-                          tileUrl = tileUrl.replace('{s}', getSubdomain(0));
-                          tileUrl = tileUrl.replace('{z}', mapZoom.toString());
-                          tileUrl = tileUrl.replace('{x}', centerTile.x.toString());
-                          tileUrl = tileUrl.replace('{y}', centerTile.y.toString());
-                          return tileUrl;
-                        })()})`,
-                        backgroundSize: '400px 400px',
-                        backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat',
-                        opacity: 0.9
+                    {/* Google Maps Embed for Perfect Positioning */}
+                    <iframe
+                      src={`https://www.google.com/maps/embed/v1/view?center=${mapCenter.lat},${mapCenter.lng}&zoom=${mapZoom}&maptype=${mapView === 'satellite' ? 'satellite' : mapView === 'terrain' ? 'hybrid' : 'roadmap'}`}
+                      className="absolute inset-0 w-full h-full border-0"
+                      style={{ 
+                        filter: mapView === 'terrain' ? 'grayscale(1) sepia(1) hue-rotate(120deg)' : 'none'
                       }}
+                      allowFullScreen
+                      title="GPS Coordinate Map Preview"
                     />
+                    
+                    {/* Overlay with coordinate info */}
+                    <div className={`absolute top-4 left-4 ${mapView === 'satellite' ? 'bg-black' : 'bg-white'} bg-opacity-90 px-3 py-2 rounded-lg shadow-lg`}>
+                      <div className={`text-xs ${mapView === 'satellite' ? 'text-gray-200' : 'text-gray-700'} font-medium`}>
+                        📍 GPS Map Preview: {gpsCoordinates.length} coordinates
+                      </div>
+                      <div className={`text-xs ${mapView === 'satellite' ? 'text-gray-300' : 'text-gray-600'}`}>
+                        {/* Show first few coordinates */}
+                        {gpsCoordinates.slice(0, 3).map((coord, index) => (
+                          <div key={index} className={`${mapView === 'satellite' ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
+                            Point {index + 1}: {coord.substring(0, 30)}...
+                          </div>
+                        ))}
+                        {gpsCoordinates.length > 3 && (
+                          <div className={`${mapView === 'satellite' ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
+                            +{gpsCoordinates.length - 3} more points...
+                          </div>
+                        )}
+                      </div>
+                      <div className={`text-xs ${mapView === 'satellite' ? 'text-gray-300' : 'text-gray-600'} mt-2`}>
+                        Center: {mapCenter.lat.toFixed(6)}°, {mapCenter.lng.toFixed(6)}° | Zoom: {mapZoom}
+                      </div>
+                    </div>
                     
                     {/* Map attribution */}
                     <div className="absolute bottom-1 right-1 text-xs text-gray-500 bg-white bg-opacity-80 px-2 py-1 rounded">
-                      {mapView === 'satellite' ? '© Google' : mapView === 'terrain' ? '© OpenTopoMap' : '© OpenStreetMap'}
+                      © Google Maps
                     </div>
-                    
-                    {/* SVG for drawing polygon and markers */}
-                    <svg 
-                      className="absolute inset-0 w-full h-full"
-                      viewBox="0 0 400 400"
-                      preserveAspectRatio="xMidYMid meet"
-                    >
-                      {/* Draw polygon */}
-                      {(() => {
-                        try {
-                          const parsedCoords: GPSCoordinate[] = [];
-                          for (const coord of gpsCoordinates) {
-                            parsedCoords.push(parseGPSCoordinate(coord));
-                          }
-                          const points = coordsToScreenPoints(parsedCoords);
-                          
-                          if (points.length >= 3) {
-                            const pathData = points.map((point, index) => 
-                              `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`
-                            ).join(' ') + ' Z';
-                            
-                            return (
-                              <path
-                                d={pathData}
-                                fill={mapView === 'satellite' ? 'rgba(255, 223, 0, 0.3)' : 'rgba(59, 130, 246, 0.3)'}
-                                stroke={mapView === 'satellite' ? 'rgba(255, 223, 0, 0.9)' : 'rgba(59, 130, 246, 0.8)'}
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            );
-                          }
-                          return null;
-                        } catch (err) {
-                          return null;
-                        }
-                      })()}
-                      
-                      {/* Draw coordinate markers */}
-                      {(() => {
-                        try {
-                          const parsedCoords: GPSCoordinate[] = [];
-                          for (const coord of gpsCoordinates) {
-                            parsedCoords.push(parseGPSCoordinate(coord));
-                          }
-                          const points = coordsToScreenPoints(parsedCoords);
-                          
-                          return points.map((point, index) => (
-                            <g key={index}>
-                              {/* Circle marker */}
-                              <circle
-                                cx={point.x}
-                                cy={point.y}
-                                r="4"
-                                fill={mapView === 'satellite' ? 'rgba(255, 59, 48, 0.9)' : 'rgba(239, 68, 68, 0.9)'}
-                                stroke="white"
-                                strokeWidth="2"
-                              />
-                              {/* Coordinate label */}
-                              <text
-                                x={point.x}
-                                y={point.y - 8}
-                                fontSize="10"
-                                fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(55, 65, 81, 0.8)'}
-                                fontWeight="500"
-                              >
-                                {index + 1}
-                              </text>
-                              {/* Coordinate values - show format based on toggle */}
-                              <text
-                                x={point.x + 8}
-                                y={point.y + 4}
-                                fontSize="6"
-                                fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(107, 114, 128, 0.7)'}
-                              >
-                                {showDecimalCoords ? 
-                                  `${parsedCoords[index].lat.toFixed(8)}°, ${parsedCoords[index].lng.toFixed(8)}°` :
-                                  gpsCoordinates[index].substring(0, 20) + (gpsCoordinates[index].length > 20 ? '...' : '')
-                                }
-                              </text>
-                            </g>
-                          ));
-                        } catch (err) {
-                          return null;
-                        }
-                      })()}
-                    </svg>
                     
                     {/* Map info overlay */}
                     <div className={`absolute top-4 left-4 ${mapView === 'satellite' ? 'bg-black' : 'bg-white'} bg-opacity-90 px-3 py-2 rounded-lg shadow-lg`}>
