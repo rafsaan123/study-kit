@@ -2,6 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react';
 
+// Declare global Google Maps types
+declare global {
+  interface Window {
+    google: any;
+    initMap: () => void;
+  }
+}
+
 interface Coordinate {
   x: number;
   y: number;
@@ -35,7 +43,118 @@ const GPSAreaCalculator = () => {
   const [mapZoom, setMapZoom] = useState(15);
   const [showDecimalCoords, setShowDecimalCoords] = useState(false);
   const [autoParseMode, setAutoParseMode] = useState(false);
+  const [googleMap, setGoogleMap] = useState<any>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
+
+  // Google Maps API Key (replace with your actual API key)
+  const GOOGLE_MAPS_API_KEY = 'AIzaSyBFw0Qbyq9zTFTd-tUY6dOcT-4f9VzT8kU';
+
+  // Load Google Maps API
+  useEffect(() => {
+    const loadGoogleMaps = () => {
+      if (window.google && window.google.maps) {
+        setMapLoaded(true);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        setMapLoaded(true);
+      };
+      document.head.appendChild(script);
+    };
+
+    loadGoogleMaps();
+  }, []);
+
+  // Initialize Google Map
+  useEffect(() => {
+    if (mapLoaded && mapRef.current && !googleMap) {
+      const map = new window.google.maps.Map(mapRef.current, {
+        center: mapCenter,
+        zoom: mapZoom,
+        mapTypeId: mapView === 'satellite' ? 'satellite' : mapView === 'terrain' ? 'terrain' : 'roadmap',
+        disableDefaultUI: false,
+        zoomControl: true,
+        mapTypeControl: true,
+        scaleControl: true,
+        streetViewControl: true,
+        rotateControl: true,
+        fullscreenControl: true
+      });
+      
+      setGoogleMap(map);
+    }
+  }, [mapLoaded, mapCenter, mapZoom, mapView, googleMap]);
+
+  // Update map when coordinates change
+  useEffect(() => {
+    if (googleMap && gpsCoordinates.length >= 3) {
+      try {
+        const parsedCoords: GPSCoordinate[] = [];
+        for (const coord of gpsCoordinates) {
+          parsedCoords.push(parseGPSCoordinate(coord));
+        }
+
+        // Clear existing markers
+        const markers = googleMap.markers || [];
+        markers.forEach((marker: any) => marker.setMap(null));
+
+        // Add new markers
+        const newMarkers: any[] = [];
+        parsedCoords.forEach((coord, index) => {
+          const marker = new window.google.maps.Marker({
+            position: { lat: coord.lat, lng: coord.lng },
+            map: googleMap,
+            title: `Point ${index + 1}: ${coord.lat.toFixed(6)}°N, ${coord.lng.toFixed(6)}°E`,
+            label: `${index + 1}`,
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: '#ef4444',
+              fillOpacity: 0.9,
+              strokeColor: '#ffffff',
+              strokeWeight: 3
+            }
+          });
+          newMarkers.push(marker);
+        });
+
+        // Store markers reference
+        googleMap.markers = newMarkers;
+
+        // Fit map to show all markers
+        if (parsedCoords.length > 0) {
+          const bounds = new window.google.maps.LatLngBounds();
+          parsedCoords.forEach(coord => {
+            bounds.extend({ lat: coord.lat, lng: coord.lng });
+          });
+          googleMap.fitBounds(bounds);
+        }
+
+        // Draw polygon if we have enough points
+        if (parsedCoords.length >= 3) {
+          const polygon = new window.google.maps.Polygon({
+            paths: parsedCoords.map(coord => ({ lat: coord.lat, lng: coord.lng })),
+            strokeColor: '#3b82f6',
+            strokeOpacity: 0.8,
+            strokeWeight: 2,
+            fillColor: '#3b82f6',
+            fillOpacity: 0.3
+          });
+          polygon.setMap(googleMap);
+          googleMap.polygon = polygon;
+        }
+
+      } catch (err) {
+        console.error('Error updating Google Map:', err);
+      }
+    }
+  }, [googleMap, gpsCoordinates]);
 
   // Reliable mapping tile servers
   const tileServers = {
@@ -947,7 +1066,7 @@ const GPSAreaCalculator = () => {
                           : 'text-gray-600 hover:text-gray-800'
                       }`}
                     >
-                      🗺️ OpenStreetMap
+                      🗺️ Google Maps
                     </button>
                     <button
                       onClick={() => setMapView('satellite')}
@@ -1001,155 +1120,28 @@ const GPSAreaCalculator = () => {
                         📍 Center: {mapCenter.lat.toFixed(6)}°N, {mapCenter.lng.toFixed(6)}°E
                       </span>
                       <span className="text-xs text-gray-600">
-                        {gpsCoordinates.length} coordinates plotted | View: {mapView === 'satellite' ? '🛰️ Satellite' : mapView === 'terrain' ? '⛰️ Terrain' : '🗺️ OpenStreetMap'}
+                        {gpsCoordinates.length} coordinates plotted | View: {mapView === 'satellite' ? '🛰️ Satellite' : mapView === 'terrain' ? '⛰️ Terrain' : '🗺️ Google Maps'}
                       </span>
                     </div>
                   </div>
                   
                   <div className="relative" style={{ height: '400px', backgroundColor: '#f8f9fa', borderRadius: '8px', overflow: 'hidden' }}>
-                    {/* Base Map Tile */}
+                    {/* Google Maps Container */}
                     <div 
-                      className="absolute inset-0 w-full h-full"
-                      style={{
-                        backgroundImage: `url(${(() => {
-                          const parsedCoords: GPSCoordinate[] = [];
-                          try {
-                            for (const coord of gpsCoordinates) {
-                              parsedCoords.push(parseGPSCoordinate(coord));
-                            }
-                          } catch (err) {
-                            parsedCoords.push(mapCenter);
-                          }
-                          
-                          if (parsedCoords.length === 0) {
-                            parsedCoords.push(mapCenter);
-                          }
-                          
-                          const lats = parsedCoords.map(c => c.lat);
-                          const lngs = parsedCoords.map(c => c.lng);
-                          const centerLat = lats.reduce((a, b) => a + b) / lats.length;
-                          const centerLng = lngs.reduce((a, b) => a + b) / lngs.length;
-                          const latRange = Math.max(...lats) - Math.min(...lats);
-                          const lngRange = Math.max(...lngs) - Math.min(...lngs);
-                          const range = Math.max(latRange, lngRange);
-                          
-                          // Dynamic zoom based on coordinate spread
-                          let zoom = 15;
-                          if (range < 0.001) zoom = 18;
-                          else if (range < 0.01) zoom = 15;
-                          else if (range < 0.1) zoom = 12;
-                          else if (range < 1.0) zoom = 9;
-                          else zoom = 6;
-                          
-                          const tileX = Math.floor((centerLng + 180) / 360 * Math.pow(2, zoom));
-                          const tileY = Math.floor((1 - Math.log(Math.tan(centerLat * Math.PI / 180) + 1 / Math.cos(centerLat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
-                          
-                          let tileUrl;
-                          if (mapView === 'satellite') {
-                            tileUrl = `https://mt1.google.com/vt/lyrs=s&x=${tileX}&y=${tileY}&z=${zoom}`;
-                          } else if (mapView === 'terrain') {
-                            tileUrl = `https://mt1.google.com/vt/lyrs=p&x=${tileX}&y=${tileY}&z=${zoom}`;
-                          } else {
-                            tileUrl = `https://tile.openstreetmap.org/${zoom}/${tileX}/${tileY}.png`;
-                          }
-                          
-                          return tileUrl;
-                        })()})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat'
-                      }}
+                      ref={mapRef}
+                      className="w-full h-full"
+                      style={{ minHeight: '400px' }}
                     />
                     
-                    {/* GPS Coordinate Markers */}
-                    <svg 
-                      className="absolute inset-0 w-full h-full"
-                      viewBox="0 0 400 400"
-                      preserveAspectRatio="xMidYMid meet"
-                    >
-                      {(() => {
-                        try {
-                          const parsedCoords: GPSCoordinate[] = [];
-                          for (const coord of gpsCoordinates) {
-                            parsedCoords.push(parseGPSCoordinate(coord));
-                          }
-                          
-                          if (parsedCoords.length === 0) return null;
-                          
-                          // Calculate map bounds for positioning with proper margins
-                          const lats = parsedCoords.map(c => c.lat);
-                          const lngs = parsedCoords.map(c => c.lng);
-                          const latRange = Math.max(...lats) - Math.min(...lats);
-                          const lngRange = Math.max(...lngs) - Math.min(...lngs);
-                          
-                          // Add 20% margin to bounds
-                          const latMargin = latRange > 0 ? latRange * 0.2 : 0.01;
-                          const lngMargin = lngRange > 0 ? lngRange * 0.2 : 0.01;
-                          
-                          const bounds = {
-                            minLat: Math.min(...lats) - latMargin,
-                            maxLat: Math.max(...lats) + latMargin,
-                            minLng: Math.min(...lngs) - lngMargin,
-                            maxLng: Math.max(...lngs) + lngMargin
-                          };
-                          
-                          return parsedCoords.map((coord, index) => {
-                            // Convert lat/lng to screen coordinates with proper scaling
-                            const x = ((coord.lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * 400;
-                            const y = ((bounds.maxLat - coord.lat) / (bounds.maxLat - bounds.minLat)) * 400;
-                            
-                            return (
-                              <g key={index}>
-                                {/* Marker */}
-                                <circle
-                                  cx={x}
-                                  cy={y}
-                                  r="8"
-                                  fill="#ef4444"
-                                  stroke="white"
-                                  strokeWidth="3"
-                                  opacity="0.9"
-                                />
-                                {/* Point number */}
-                                <text
-                                  x={x}
-                                  y={y + 3}
-                                  fontSize="10"
-                                  fill="white"
-                                  textAnchor="middle"
-                                  fontWeight="bold"
-                                >
-                                  {index + 1}
-                                </text>
-                                {/* Coordinate info */}
-                                {index < 3 && (
-                                  <g>
-                                    <rect
-                                      x={x + 12}
-                                      y={y - 20}
-                                      width="120"
-                                      height="14"
-                                      fill="rgba(0,0,0,0.7)"
-                                      rx="2"
-                                    />
-                                    <text
-                                      x={x + 18}
-                                      y={y - 12}
-                                      fontSize="8"
-                                      fill="white"
-                                    >
-                                      {coord.lat.toFixed(6)}°N, {coord.lng.toFixed(6)}°E
-                                    </text>
-                                  </g>
-                                )}
-                              </g>
-                            );
-                          });
-                        } catch (err) {
-                          return null;
-                        }
-                      })()}
-                    </svg>
+                    {/* Loading indicator */}
+                    {!mapLoaded && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                          <p className="text-sm text-gray-600">Loading Google Maps...</p>
+                        </div>
+                      </div>
+                    )}
                     
                     {/* Overlay with coordinate info */}
                     <div className={`absolute top-4 left-4 ${mapView === 'satellite' ? 'bg-black' : 'bg-white'} bg-opacity-90 px-3 py-2 rounded-lg shadow-lg`}>
@@ -1196,7 +1188,7 @@ const GPSAreaCalculator = () => {
                     
                     {/* Map attribution */}
                     <div className="absolute bottom-1 right-1 text-xs text-gray-500 bg-white bg-opacity-80 px-2 py-1 rounded">
-                      © OpenStreetMap contributors
+                      © Google Maps
                     </div>
                     
                     {/* Map info overlay */}
