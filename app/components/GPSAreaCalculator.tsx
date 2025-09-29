@@ -36,11 +36,11 @@ const GPSAreaCalculator = () => {
   const [showDecimalCoords, setShowDecimalCoords] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
 
-  // Real tile server URLs for different map types (using reliable sources)
+  // Google Earth/Maps tile servers for accurate coordinate matching
   const tileServers = {
-    standard: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    standard: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
     satellite: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-    terrain: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
+    terrain: 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}'
   };
 
   // Convert lat/lng/z to tile coordinates
@@ -285,15 +285,25 @@ const GPSAreaCalculator = () => {
       
       // Debug GPS coordinate parsing
       if (inputMode === 'gps') {
-        console.log('Debug GPS parsing:');
+        console.log('=== GPS MAP PREVIEW DEBUG ===');
+        console.log('Map server used:', tileServers[mapView]);
+        console.log('Map center:', mapCenter);
+        console.log('Map zoom level:', mapZoom);
+        console.log('');
+        console.log('Coordinates parsing:');
         gpsCoordinates.forEach((coord, index) => {
           try {
             const parsed = parseGPSCoordinate(coord);
-            console.log(`Coord ${index + 1}: "${coord}" -> ${parsed.lat.toFixed(8)}, ${parsed.lng.toFixed(8)}`);
+            console.log(`Point ${index + 1}:`);
+            console.log(`  Original DMS: "${coord}"`);
+            console.log(`  Converted: ${parsed.lat.toFixed(8)}°, ${parsed.lng.toFixed(8)}°`);
+            console.log(`  Google Maps URL: https://www.google.com/maps/@${parsed.lat},${parsed.lng},${mapZoom}z`);
           } catch (err) {
-            console.log(`Coord ${index + 1}: "${coord}" -> ERROR`);
+            console.log(`Point ${index + 1}: "${coord}" -> ERROR`);
           }
         });
+        console.log('');
+        console.log('Note: Using Google Earth/Maps tiles for accurate positioning');
       }
 
       // Update map center and zoom for GPS coordinates
@@ -821,7 +831,7 @@ const GPSAreaCalculator = () => {
                           : 'text-gray-600 hover:text-gray-800'
                       }`}
                     >
-                      🗺️ Standard
+                      🗺️ Google Maps
                     </button>
                     <button
                       onClick={() => setMapView('satellite')}
@@ -831,7 +841,7 @@ const GPSAreaCalculator = () => {
                           : 'text-gray-600 hover:text-gray-800'
                       }`}
                     >
-                      🛰️ Satellite
+                      🌍 Google Earth
                     </button>
                     <button
                       onClick={() => setMapView('terrain')}
@@ -841,7 +851,7 @@ const GPSAreaCalculator = () => {
                           : 'text-gray-600 hover:text-gray-800'
                       }`}
                     >
-                      ⛰️ Terrain
+                      ⛰️ Google Terrain
                     </button>
                   </div>
                   <button
@@ -903,7 +913,7 @@ const GPSAreaCalculator = () => {
                     
                     {/* Map attribution */}
                     <div className="absolute bottom-1 right-1 text-xs text-gray-500 bg-white bg-opacity-80 px-2 py-1 rounded">
-                      {mapView === 'satellite' ? '© Google Satellite' : mapView === 'terrain' ? '© OpenTopoMap' : '© OpenStreetMap'}
+                      {mapView === 'satellite' ? '© Google Earth' : mapView === 'terrain' ? '© Google Terrain' : '© Google Maps'}
                     </div>
                     
                     {/* SVG for drawing polygon and markers */}
