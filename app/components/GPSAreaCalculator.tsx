@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface Coordinate {
   x: number;
@@ -29,6 +29,36 @@ const GPSAreaCalculator = () => {
   const [gpsCoordinates, setGpsCoordinates] = useState<string[]>([]);
   const [result, setResult] = useState<AreaResult | null>(null);
   const [error, setError] = useState<string>('');
+  const [showMap, setShowMap] = useState(false);
+  const [mapCenter, setMapCenter] = useState({ lat: 23.7806, lng: 90.4392 }); // Dhaka coordinates
+  const [mapZoom, setMapZoom] = useState(15);
+  const mapRef = useRef<HTMLDivElement>(null);
+
+  // Convert coordinates to screen points for map drawing
+  const coordsToScreenPoints = (coords: GPSCoordinate[]): { x: number; y: number }[] => {
+    if (coords.length === 0) return [];
+
+    const bounds = coords.reduce((acc, coord) => ({
+      minLat: Math.min(acc.minLat, coord.lat),
+      maxLat: Math.max(acc.maxLat, coord.lat),
+      minLng: Math.min(acc.minLng, coord.lng),
+      maxLng: Math.max(acc.maxLng, coord.lng)
+    }), {
+      minLat: coords[0].lat,
+      maxLat: coords[0].lat,
+      minLng: coords[0].lng,
+      maxLng: coords[0].lng
+    });
+
+    const latRange = mapCenter.lat - bounds.minLat + bounds.maxLat - mapCenter.lat;
+    const lngRange = mapCenter.lng - bounds.minLng + bounds.maxLng - mapCenter.lng;
+    const maxRange = Math.max(latRange, lngRange, 0.001); // Minimum range to avoid division by zero
+
+    return coords.map(coord => ({
+      x: 200 + (coord.lng - mapCenter.lng) * 400 / maxRange,
+      y: 200 + (mapCenter.lat - coord.lat) * 400 / maxRange
+    }));
+  };
 
   // Parse GPS coordinate string to decimal degrees
   const parseGPSCoordinate = (coordStr: string): GPSCoordinate => {
@@ -219,6 +249,26 @@ const GPSAreaCalculator = () => {
       // Log coordinates for debugging
       console.log('Coordinates in meters:', metersCoords);
       console.log('Calculated area in m²:', areaInSquareMeters);
+
+      // Update map center for GPS coordinates
+      if (inputMode === 'gps') {
+        try {
+          const parsedCoords: GPSCoordinate[] = [];
+          for (const coord of gpsCoordinates) {
+            parsedCoords.push(parseGPSCoordinate(coord));
+          }
+          
+          if (parsedCoords.length > 0) {
+            // Calculate centroid of the polygon
+            const avgLat = parsedCoords.reduce((sum, coord) => sum + coord.lat, 0) / parsedCoords.length;
+            const avgLng = parsedCoords.reduce((sum, coord) => sum + coord.lng, 0) / parsedCoords.length;
+            setMapCenter({ lat: avgLat, lng: avgLng });
+          }
+        } catch (err) {
+          // Keep default center if parsing fails
+          console.log('Could not update map center');
+        }
+      }
 
       // Bangladesh Standard Conversions based on the documentation
       const squareMeters = areaInSquareMeters;
@@ -522,8 +572,197 @@ const GPSAreaCalculator = () => {
             <div className="mt-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
               <p className="text-xs text-yellow-800">
                 <strong>GPS Accuracy Note:</strong> Area calculation uses Mercator projection optimized for Bangladesh region (latitude ~24°). 
-                Results are approximate with ±1-3% accuracy depending on plot size and GPS precision.
+                Results are approximate with ±1-3% accuracy depending on plot size and GPS precision. 
+                The map preview shows the polygon visualization for verification.
               </p>
+            </div>
+          )}
+
+          {/* Map Preview */}
+          {inputMode === 'gps' && result && gpsCoordinates.length >= 3 && (
+            <div className="mt-6">
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-lg font-semibold text-gray-700">📍 Map Preview</h4>
+                <button
+                  onClick={() => setShowMap(!showMap)}
+                  className={`px-4 py-2 rounded-md transition-colors ${
+                    showMap 
+                      ? 'bg-red-100 text-red-600 hover:bg-red-200' 
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  {showMap ? 'Hide Map' : 'Show Map'}
+                </button>
+              </div>
+              
+              {showMap && (
+                <div className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-green-50 p-3 border-b border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-green-800 font-medium">
+                        📍 Center: {mapCenter.lat.toFixed(6)}°N, {mapCenter.lng.toFixed(6)}°E
+                      </span>
+                      <span className="text-xs text-gray-600">
+                        {gpsCoordinates.length} coordinates plotted
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="relative" style={{ height: '400px' }}>
+                    {/* Background map simulation */}
+                    <div 
+                      className="absolute inset-0 bg-gradient-to-br from-green-100 via-green-50 to-blue-50"
+                      style={{
+                        backgroundImage: `
+                          radial-gradient(circle at 20% 20%, rgba(34, 197, 94, 0.1) 0%, transparent 50%),
+                          radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                          linear-gradient(45deg, rgba(34, 197, 94, 0.05) 25%, transparent 25%),
+                          linear-gradient(-45deg, rgba(59, 130, 246, 0.05) 25%, transparent 25%)
+                        `
+                      }}
+                    ></div>
+                    
+                    {/* Grid overlay */}
+                    <div 
+                      className="absolute inset-0 opacity-20"
+                      style={{
+                        backgroundImage: `
+                          linear-gradient(rgba(107, 114, 128, 0.3) 1px, transparent 1px),
+                          linear-gradient(90deg, rgba(107, 114, 128, 0.3) 1px, transparent 1px)
+                        `,
+                        backgroundSize: '20px 20px'
+                      }}
+                    ></div>
+                    
+                    {/* SVG for drawing polygon and markers */}
+                    <svg 
+                      className="absolute inset-0 w-full h-full"
+                      viewBox="0 0 400 400"
+                      preserveAspectRatio="xMidYMid meet"
+                    >
+                      {/* Draw polygon */}
+                      {(() => {
+                        try {
+                          const parsedCoords: GPSCoordinate[] = [];
+                          for (const coord of gpsCoordinates) {
+                            parsedCoords.push(parseGPSCoordinate(coord));
+                          }
+                          const points = coordsToScreenPoints(parsedCoords);
+                          
+                          if (points.length >= 3) {
+                            const pathData = points.map((point, index) => 
+                              `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`
+                            ).join(' ') + ' Z';
+                            
+                            return (
+                              <path
+                                d={pathData}
+                                fill="rgba(59, 130, 246, 0.3)"
+                                stroke="rgba(59, 130, 246, 0.8)"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            );
+                          }
+                          return null;
+                        } catch (err) {
+                          return null;
+                        }
+                      })()}
+                      
+                      {/* Draw coordinate markers */}
+                      {(() => {
+                        try {
+                          const parsedCoords: GPSCoordinate[] = [];
+                          for (const coord of gpsCoordinates) {
+                            parsedCoords.push(parseGPSCoordinate(coord));
+                          }
+                          const points = coordsToScreenPoints(parsedCoords);
+                          
+                          return points.map((point, index) => (
+                            <g key={index}>
+                              {/* Circle marker */}
+                              <circle
+                                cx={point.x}
+                                cy={point.y}
+                                r="4"
+                                fill="rgba(239, 68, 68, 0.9)"
+                                stroke="white"
+                                strokeWidth="2"
+                              />
+                              {/* Coordinate label */}
+                              <text
+                                x={point.x + 8}
+                                y={point.y - 8}
+                                fontSize="10"
+                                fill="rgba(55, 65, 81, 0.8)"
+                                fontWeight="500"
+                              >
+                                {index + 1}
+                              </text>
+                              {/* Coordinate values */}
+                              <text
+                                x={point.x + 8}
+                                y={point.y + 4}
+                                fontSize="8"
+                                fill="rgba(107, 114, 128, 0.7)"
+                              >
+                                {parsedCoords[index].lat.toFixed(4)}°N
+
+                              </text>
+                              <text
+                                x={point.x + 8}
+                                y={point.y + 12}
+                                fontSize="8"
+                                fill="rgba(107, 114, 128, 0.7)"
+                              >
+                                {parsedCoords[index].lng.toFixed(4)}°E
+                              </text>
+                            </g>
+                          ));
+                        } catch (err) {
+                          return null;
+                        }
+                      })()}
+                    </svg>
+                    
+                    {/* Map info overlay */}
+                    <div className="absolute top-4 left-4 bg-white bg-opacity-90 px-3 py-2 rounded-lg shadow-lg">
+                      <div className="text-xs text-gray-700 font-medium">
+                        <div>📍 {gpsCoordinates.length} points plotted</div>
+                        <div className="text-gray-500 mt-1">
+                          Area: {result?.squareMeters.toFixed(2)} m²
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Coordinate list */}
+                  <div className="bg-gray-50 p-3 border-t border-gray-200">
+                    <div className="text-xs text-gray-600">
+                      <strong>Coordinates plotted:</strong>
+                      <div className="mt-1 max-h-32 overflow-y-auto">
+                        {gpsCoordinates.map((coord, index) => (
+                          <div key={index} className="flex justify-between items-center py-1">
+                            <span className="font-mono text-xs">{coord}</span>
+                            <span className="text-xs text-gray-400 ml-2">
+                              {(() => {
+                                try {
+                                  const parsed = parseGPSCoordinate(coord);
+                                  return `${parsed.lat.toFixed(4)}°, ${parsed.lng.toFixed(4)}°`;
+                                } catch (err) {
+                                  return 'Invalid';
+                                }
+                              })()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -537,6 +776,7 @@ const GPSAreaCalculator = () => {
           <li>• Add at least 3 coordinates to form a polygon and calculate area</li>
           <li>• Coordinates should be entered in order (clockwise or counter-clockwise)</li>
           <li>• Click &quot;Load Sample&quot; to load example coordinates</li>
+          <li>• Click &quot;Show Map&quot; to preview GPS coordinates visually after calculation</li>
           <li>• The area is calculated using the Shoelace formula (Gauss&apos;s area formula)</li>
         </ul>
       </div>
