@@ -29,7 +29,8 @@ const GPSAreaCalculator = () => {
   const [gpsCoordinates, setGpsCoordinates] = useState<string[]>([]);
   const [result, setResult] = useState<AreaResult | null>(null);
   const [error, setError] = useState<string>('');
-  const [showMap, setShowMap] = useState(false);
+  const [showMap, setShowMap] = useState(true);
+  const [mapView, setMapView] = useState<'standard' | 'satellite'>('standard');
   const [mapCenter, setMapCenter] = useState({ lat: 23.7806, lng: 90.4392 }); // Dhaka coordinates
   const [mapZoom, setMapZoom] = useState(15);
   const mapRef = useRef<HTMLDivElement>(null);
@@ -164,7 +165,7 @@ const GPSAreaCalculator = () => {
   };
 
   const addGpsCoordinate = () => {
-    setGpsCoordinates([...gpsCoordinates, "24°24'10.5\"N 88°37'34.7\"E"]);
+    setGpsCoordinates([...gpsCoordinates, ""]);
     setError('');
   };
 
@@ -309,6 +310,133 @@ const GPSAreaCalculator = () => {
     setGpsCoordinates([]);
     setResult(null);
     setError('');
+  };
+
+  const exportData = (format: 'json' | 'csv' | 'text') => {
+    if (!result) return;
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    let filename = `land-area-calculation-${timestamp}`;
+    let content = '';
+    let mimeType = '';
+
+    if (format === 'json') {
+      const exportData = {
+        timestamp: new Date().toISOString(),
+        inputMode: inputMode,
+        coordinates: inputMode === 'manual' ? coordinates : gpsCoordinates,
+        parsedGPSCoordinates: inputMode === 'gps' ? gpsCoordinates.map(coord => {
+          try {
+            const parsed = parseGPSCoordinate(coord);
+            return { original: coord, lat: parsed.lat, lng: parsed.lng };
+          } catch {
+            return { original: coord, error: 'Invalid coordinate' };
+          }
+        }) : null,
+        results: {
+          squareMeters: result.squareMeters,
+          squareFeet: result.squareFeet,
+          katha: result.katha,
+          bigha: result.bigha,
+          acre: result.acre,
+          decimal: result.decimal,
+          shotok: result.shotok,
+          kani: result.kani
+        },
+        location: inputMode === 'gps' ? {
+          center: mapCenter,
+          country: 'Bangladesh'
+        } : null
+      };
+      content = JSON.stringify(exportData, null, 2);
+      filename += '.json';
+      mimeType = 'application/json';
+
+    } else if (format === 'csv') {
+      // Create CSV content
+      const headers = ['Point', inputMode === 'manual' ? 'X (m)' : 'GPS Coordinate', inputMode === 'manual' ? 'Y (m)' : 'Latitude', inputMode === 'gps' ? 'Longitude' : ''].filter(h => h);
+      const rows: string[][] = [];
+      
+      if (inputMode === 'manual') {
+        coordinates.forEach((coord, index) => {
+          rows.push([`${index + 1}`, coord.x.toString(), coord.y.toString()]);
+        });
+      } else {
+        gpsCoordinates.forEach((coord, index) => {
+          try {
+            const parsed = parseGPSCoordinate(coord);
+            rows.push([`${index + 1}`, coord, parsed.lat.toString(), parsed.lng.toString()]);
+          } catch {
+            rows.push([`${index + 1}`, coord, 'Invalid', 'Invalid']);
+          }
+        });
+      }
+      
+      // Add results section
+      rows.push([]);
+      rows.push(['CALCULATION RESULTS']);
+      rows.push(['Measurement Unit', 'Value']);
+      rows.push(['Square Meters', result.squareMeters.toString()]);
+      rows.push(['Square Feet', result.squareFeet.toString()]);
+      rows.push(['Katha', result.katha.toString()]);
+      rows.push(['Bigha', result.bigha.toString()]);
+      rows.push(['Acre', result.acre.toString()]);
+      rows.push(['Decimal', result.decimal.toString()]);
+      rows.push(['Shotok', result.shotok.toString()]);
+      rows.push(['Kani', result.kani.toString()]);
+      
+      content = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+      filename += '.csv';
+      mimeType = 'text/csv';
+
+    } else if (format === 'text') {
+      // Create text report
+      let textContent = '=== BANGLADESH LAND AREA CALCULATION REPORT ===\n\n';
+      textContent += `Date: ${new Date().toLocaleString()}\n`;
+      textContent += `Input Mode: ${inputMode.toUpperCase()}\n\n`;
+      
+      textContent += '--- COORDINATES ---\n';
+      if (inputMode === 'manual') {
+        coordinates.forEach((coord, index) => {
+          textContent += `Point ${index + 1}: X=${coord.x}m, Y=${coord.y}m\n`;
+        });
+      } else {
+        gpsCoordinates.forEach((coord, index) => {
+          try {
+            const parsed = parseGPSCoordinate(coord);
+            textContent += `Point ${index + 1}: ${coord} (${parsed.lat.toFixed(6)}°, ${parsed.lng.toFixed(6)}°)\n`;
+          } catch {
+            textContent += `Point ${index + 1}: ${coord} (Invalid)\n`;
+          }
+        });
+        textContent += `\nMap Center: ${mapCenter.lat.toFixed(6)}°N, ${mapCenter.lng.toFixed(6)}°E\n`;
+      }
+      
+      textContent += '\n--- AREA CALCULATIONS ---\n';
+      textContent += `Square Meters: ${result.squareMeters.toLocaleString()} m²\n`;
+      textContent += `Square Feet: ${result.squareFeet.toLocaleString()} ft²\n`;
+      textContent += `Katha (কাঠা): ${result.katha.toFixed(4)} (720 ft² each)\n`;
+      textContent += `Bigha (বিঘা): ${result.bigha.toFixed(4)} (20 Katha each)\n`;
+      textContent += `Acre (একর): ${result.acre.toFixed(4)} (100 Shotok each)\n`;
+      textContent += `Decimal (শতাংশ): ${result.decimal.toFixed(4)} (435.6 ft² each)\n`;
+      textContent += `Shotok (শতক): ${result.shotok.toFixed(4)} (= Decimal)\n`;
+      textContent += `Kani (কানি): ${result.kani.toFixed(4)} (40 Shotok each)\n`;
+      
+      content = textContent;
+      filename += '.txt';
+      mimeType = 'text/plain';
+    }
+
+    // Create download link
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -507,7 +635,32 @@ const GPSAreaCalculator = () => {
 
       {result && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-700">Calculation Results</h3>
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-gray-700">Calculation Results</h3>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => exportData('json')}
+                className="px-3 py-1 bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200 transition-colors text-sm"
+                title="Export as JSON"
+              >
+                📋 JSON
+              </button>
+              <button
+                onClick={() => exportData('csv')}
+                className="px-3 py-1 bg-green-100 text-green-600 rounded-md hover:bg-green-200 transition-colors text-sm"
+                title="Export as CSV"
+              >
+                📊 CSV
+              </button>
+              <button
+                onClick={() => exportData('text')}
+                className="px-3 py-1 bg-purple-100 text-purple-600 rounded-md hover:bg-purple-200 transition-colors text-sm"
+                title="Export as Text Report"
+              >
+                📄 Report
+              </button>
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg text-center border border-blue-200">
@@ -583,16 +736,40 @@ const GPSAreaCalculator = () => {
             <div className="mt-6">
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-lg font-semibold text-gray-700">📍 Map Preview</h4>
-                <button
-                  onClick={() => setShowMap(!showMap)}
-                  className={`px-4 py-2 rounded-md transition-colors ${
-                    showMap 
-                      ? 'bg-red-100 text-red-600 hover:bg-red-200' 
-                      : 'bg-blue-500 text-white hover:bg-blue-600'
-                  }`}
-                >
-                  {showMap ? 'Hide Map' : 'Show Map'}
-                </button>
+                <div className="flex space-x-2">
+                  <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+                    <button
+                      onClick={() => setMapView('standard')}
+                      className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                        mapView === 'standard'
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                    >
+                      🗺️ Standard
+                    </button>
+                    <button
+                      onClick={() => setMapView('satellite')}
+                      className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                        mapView === 'satellite'
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                    >
+                      🛰️ Satellite
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowMap(!showMap)}
+                    className={`px-4 py-2 rounded-md transition-colors text-sm ${
+                      showMap 
+                        ? 'bg-red-100 text-red-600 hover:bg-red-200' 
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                    }`}
+                  >
+                    {showMap ? 'Hide Map' : 'Show Map'}
+                  </button>
+                </div>
               </div>
               
               {showMap && (
@@ -603,7 +780,7 @@ const GPSAreaCalculator = () => {
                         📍 Center: {mapCenter.lat.toFixed(6)}°N, {mapCenter.lng.toFixed(6)}°E
                       </span>
                       <span className="text-xs text-gray-600">
-                        {gpsCoordinates.length} coordinates plotted
+                        {gpsCoordinates.length} coordinates plotted | View: {mapView === 'satellite' ? '🛰️ Satellite' : '🗺️ Standard'}
                       </span>
                     </div>
                   </div>
@@ -611,28 +788,52 @@ const GPSAreaCalculator = () => {
                   <div className="relative" style={{ height: '400px' }}>
                     {/* Background map simulation */}
                     <div 
-                      className="absolute inset-0 bg-gradient-to-br from-green-100 via-green-50 to-blue-50"
-                      style={{
+                      className="absolute inset-0"
+                      style={mapView === 'satellite' ? {
+                        backgroundImage: `
+                          linear-gradient(135deg, #1e3a4a 0%, #2d5f47 25%, #3a6b4f 50%, #2d5f47 75%, #1e3a4a 100%),
+                          radial-gradient(circle at 30% 40%, rgba(139, 92, 56, 0.4) 0%, transparent 40%),
+                          radial-gradient(circle at 70% 60%, rgba(92, 107, 84, 0.4) 0%, transparent 40%),
+                          radial-gradient(circle at 20% 80%, rgba(107, 114, 87, 0.3) 0%, transparent 30%)
+                        `,
+                        backgroundColor: '#2a4539'
+                      } : {
                         backgroundImage: `
                           radial-gradient(circle at 20% 20%, rgba(34, 197, 94, 0.1) 0%, transparent 50%),
                           radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
                           linear-gradient(45deg, rgba(34, 197, 94, 0.05) 25%, transparent 25%),
                           linear-gradient(-45deg, rgba(59, 130, 246, 0.05) 25%, transparent 25%)
-                        `
+                        `,
+                        backgroundColor: mapView === 'satellite' ? '#1a2f1a' : ''
                       }}
+                      className={mapView === 'standard' ? 'bg-gradient-to-br from-green-100 via-green-50 to-blue-50' : ''}
                     ></div>
                     
                     {/* Grid overlay */}
                     <div 
-                      className="absolute inset-0 opacity-20"
+                      className="absolute inset-0"
                       style={{
                         backgroundImage: `
-                          linear-gradient(rgba(107, 114, 128, 0.3) 1px, transparent 1px),
-                          linear-gradient(90deg, rgba(107, 114, 128, 0.3) 1px, transparent 1px)
+                          linear-gradient(${mapView === 'satellite' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(107, 114, 128, 0.3)'} 1px, transparent 1px),
+                          linear-gradient(90deg, ${mapView === 'satellite' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(107, 114, 128, 0.3)'} 1px, transparent 1px)
                         `,
-                        backgroundSize: '20px 20px'
+                        backgroundSize: '20px 20px',
+                        opacity: mapView === 'satellite' ? 0.3 : 0.2
                       }}
                     ></div>
+                    
+                    {/* Satellite texture overlay */}
+                    {mapView === 'satellite' && (
+                      <div 
+                        className="absolute inset-0 opacity-30"
+                        style={{
+                          backgroundImage: `
+                            repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.1) 10px, rgba(0,0,0,0.1) 20px),
+                            repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(255,255,255,0.05) 10px, rgba(255,255,255,0.05) 20px)
+                          `
+                        }}
+                      ></div>
+                    )}
                     
                     {/* SVG for drawing polygon and markers */}
                     <svg 
@@ -657,8 +858,8 @@ const GPSAreaCalculator = () => {
                             return (
                               <path
                                 d={pathData}
-                                fill="rgba(59, 130, 246, 0.3)"
-                                stroke="rgba(59, 130, 246, 0.8)"
+                                fill={mapView === 'satellite' ? 'rgba(255, 223, 0, 0.3)' : 'rgba(59, 130, 246, 0.3)'}
+                                stroke={mapView === 'satellite' ? 'rgba(255, 223, 0, 0.9)' : 'rgba(59, 130, 246, 0.8)'}
                                 strokeWidth="2"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -687,7 +888,7 @@ const GPSAreaCalculator = () => {
                                 cx={point.x}
                                 cy={point.y}
                                 r="4"
-                                fill="rgba(239, 68, 68, 0.9)"
+                                fill={mapView === 'satellite' ? 'rgba(255, 59, 48, 0.9)' : 'rgba(239, 68, 68, 0.9)'}
                                 stroke="white"
                                 strokeWidth="2"
                               />
@@ -696,8 +897,9 @@ const GPSAreaCalculator = () => {
                                 x={point.x + 8}
                                 y={point.y - 8}
                                 fontSize="10"
-                                fill="rgba(55, 65, 81, 0.8)"
+                                fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(55, 65, 81, 0.8)'}
                                 fontWeight="500"
+                                style={mapView === 'satellite' ? { textShadow: '1px 1px 2px rgba(0,0,0,0.8)' } : {}}
                               >
                                 {index + 1}
                               </text>
@@ -706,16 +908,17 @@ const GPSAreaCalculator = () => {
                                 x={point.x + 8}
                                 y={point.y + 4}
                                 fontSize="8"
-                                fill="rgba(107, 114, 128, 0.7)"
+                                fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(107, 114, 128, 0.7)'}
+                                style={mapView === 'satellite' ? { textShadow: '1px 1px 2px rgba(0,0,0,0.8)' } : {}}
                               >
                                 {parsedCoords[index].lat.toFixed(4)}°N
-
                               </text>
                               <text
                                 x={point.x + 8}
                                 y={point.y + 12}
                                 fontSize="8"
-                                fill="rgba(107, 114, 128, 0.7)"
+                                fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(107, 114, 128, 0.7)'}
+                                style={mapView === 'satellite' ? { textShadow: '1px 1px 2px rgba(0,0,0,0.8)' } : {}}
                               >
                                 {parsedCoords[index].lng.toFixed(4)}°E
                               </text>
@@ -728,10 +931,10 @@ const GPSAreaCalculator = () => {
                     </svg>
                     
                     {/* Map info overlay */}
-                    <div className="absolute top-4 left-4 bg-white bg-opacity-90 px-3 py-2 rounded-lg shadow-lg">
-                      <div className="text-xs text-gray-700 font-medium">
+                    <div className={`absolute top-4 left-4 ${mapView === 'satellite' ? 'bg-black' : 'bg-white'} bg-opacity-90 px-3 py-2 rounded-lg shadow-lg`}>
+                      <div className={`text-xs ${mapView === 'satellite' ? 'text-gray-200' : 'text-gray-700'} font-medium`}>
                         <div>📍 {gpsCoordinates.length} points plotted</div>
-                        <div className="text-gray-500 mt-1">
+                        <div className={mapView === 'satellite' ? 'text-gray-400 mt-1' : 'text-gray-500 mt-1'}>
                           Area: {result?.squareMeters.toFixed(2)} m²
                         </div>
                       </div>
@@ -776,6 +979,7 @@ const GPSAreaCalculator = () => {
           <li>• Add at least 3 coordinates to form a polygon and calculate area</li>
           <li>• Coordinates should be entered in order (clockwise or counter-clockwise)</li>
           <li>• Click &quot;Load Sample&quot; to load example coordinates</li>
+          <li>• <strong>Export Options:</strong> Save results as JSON, CSV, or Text Report</li>
           <li>• Click &quot;Show Map&quot; to preview GPS coordinates visually after calculation</li>
           <li>• The area is calculated using the Shoelace formula (Gauss&apos;s area formula)</li>
         </ul>
