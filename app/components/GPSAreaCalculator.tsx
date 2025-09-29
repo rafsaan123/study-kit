@@ -1174,7 +1174,7 @@ const GPSAreaCalculator = () => {
                           : 'text-gray-600 hover:text-gray-800'
                         }`}
                       >
-                      ⛰️ OpenTopoMap
+                      ⛰️ Terrain
                     </button>
                   </div>
               <button
