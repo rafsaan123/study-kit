@@ -30,15 +30,38 @@ const GPSAreaCalculator = () => {
   const [result, setResult] = useState<AreaResult | null>(null);
   const [error, setError] = useState<string>('');
   const [showMap, setShowMap] = useState(true);
-  const [mapView, setMapView] = useState<'standard' | 'satellite'>('standard');
+  const [mapView, setMapView] = useState<'standard' | 'satellite' | 'terrain'>('standard');
   const [mapCenter, setMapCenter] = useState({ lat: 23.7806, lng: 90.4392 }); // Dhaka coordinates
   const [mapZoom, setMapZoom] = useState(15);
   const mapRef = useRef<HTMLDivElement>(null);
 
-  // Convert coordinates to screen points for map drawing
+  // Real tile server URLs for different map types
+  const tileServers = {
+    standard: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    terrain: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
+  };
+
+  // Convert lat/lng/z to tile coordinates
+  const getTileCoords = (lat: number, lng: number, zoom: number) => {
+    const x = Math.floor((lng + 180) / 360 * Math.pow(2, zoom));
+    const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
+    return { x, y };
+  };
+
+  // Get tile server subdomains (for load balancing)
+  const getSubdomain = (index: number) => {
+    const subdomains = mapView === 'standard' ? ['a', 'b', 'c'] :
+                      mapView === 'satellite' ? [''] :
+                      ['a', 'b', 'c']; // terrain
+    return subdomains[index % subdomains.length];
+  };
+
+  // Convert coordinates to screen points for map drawing (simplified for single tile)
   const coordsToScreenPoints = (coords: GPSCoordinate[]): { x: number; y: number }[] => {
     if (coords.length === 0) return [];
 
+    // Calculate bounds of all coordinates
     const bounds = coords.reduce((acc, coord) => ({
       minLat: Math.min(acc.minLat, coord.lat),
       maxLat: Math.max(acc.maxLat, coord.lat),
@@ -51,13 +74,21 @@ const GPSAreaCalculator = () => {
       maxLng: coords[0].lng
     });
 
-    const latRange = mapCenter.lat - bounds.minLat + bounds.maxLat - mapCenter.lat;
-    const lngRange = mapCenter.lng - bounds.minLng + bounds.maxLng - mapCenter.lng;
-    const maxRange = Math.max(latRange, lngRange, 0.001); // Minimum range to avoid division by zero
-
+    // Calculate the map extent based on bounds
+    const latRange = bounds.maxLat - bounds.minLat;
+    const lngRange = bounds.maxLng - bounds.minLng;
+    const maxRange = Math.max(latRange, lngRange, 0.001);
+    
+    // Scale to fit within 400x400 SVG canvas
+    const scale = 350 / maxRange; // Leave some margin
+    
+    // Calculate center point for scaling
+    const centerLat = (bounds.minLat + bounds.maxLat) / 2;
+    const centerLng = (bounds.minLng + bounds.maxLng) / 2;
+    
     return coords.map(coord => ({
-      x: 200 + (coord.lng - mapCenter.lng) * 400 / maxRange,
-      y: 200 + (mapCenter.lat - coord.lat) * 400 / maxRange
+      x: 200 + (coord.lng - centerLng) * scale,
+      y: 200 - (coord.lat - centerLat) * scale // Flip Y axis for screen coordinates
     }));
   };
 
@@ -758,6 +789,16 @@ const GPSAreaCalculator = () => {
                     >
                       🛰️ Satellite
                     </button>
+                    <button
+                      onClick={() => setMapView('terrain')}
+                      className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                        mapView === 'terrain'
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                    >
+                      ⛰️ Terrain
+                    </button>
                   </div>
                   <button
                     onClick={() => setShowMap(!showMap)}
@@ -780,59 +821,36 @@ const GPSAreaCalculator = () => {
                         📍 Center: {mapCenter.lat.toFixed(6)}°N, {mapCenter.lng.toFixed(6)}°E
                       </span>
                       <span className="text-xs text-gray-600">
-                        {gpsCoordinates.length} coordinates plotted | View: {mapView === 'satellite' ? '🛰️ Satellite' : '🗺️ Standard'}
+                        {gpsCoordinates.length} coordinates plotted | View: {mapView === 'satellite' ? '🛰️ Satellite' : mapView === 'terrain' ? '⛰️ Terrain' : '🗺️ Standard'}
                       </span>
                     </div>
                   </div>
                   
-                  <div className="relative" style={{ height: '400px' }}>
-                    {/* Background map simulation */}
+                  <div className="relative" style={{ height: '400px', backgroundColor: '#f8f9fa' }}>
+                    {/* Real Map Tile */}
                     <div 
-                      className="absolute inset-0"
-                      style={mapView === 'satellite' ? {
-                        backgroundImage: `
-                          linear-gradient(135deg, #1e3a4a 0%, #2d5f47 25%, #3a6b4f 50%, #2d5f47 75%, #1e3a4a 100%),
-                          radial-gradient(circle at 30% 40%, rgba(139, 92, 56, 0.4) 0%, transparent 40%),
-                          radial-gradient(circle at 70% 60%, rgba(92, 107, 84, 0.4) 0%, transparent 40%),
-                          radial-gradient(circle at 20% 80%, rgba(107, 114, 87, 0.3) 0%, transparent 30%)
-                        `,
-                        backgroundColor: '#2a4539'
-                      } : {
-                        backgroundImage: `
-                          radial-gradient(circle at 20% 20%, rgba(34, 197, 94, 0.1) 0%, transparent 50%),
-                          radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
-                          linear-gradient(45deg, rgba(34, 197, 94, 0.05) 25%, transparent 25%),
-                          linear-gradient(-45deg, rgba(59, 130, 246, 0.05) 25%, transparent 25%)
-                        `,
-                        backgroundColor: '#f0f9f0'
-                      }}
-                    ></div>
-                    
-                    {/* Grid overlay */}
-                    <div 
-                      className="absolute inset-0"
+                      className="absolute inset-0 w-full h-full"
                       style={{
-                        backgroundImage: `
-                          linear-gradient(${mapView === 'satellite' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(107, 114, 128, 0.3)'} 1px, transparent 1px),
-                          linear-gradient(90deg, ${mapView === 'satellite' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(107, 114, 128, 0.3)'} 1px, transparent 1px)
-                        `,
-                        backgroundSize: '20px 20px',
-                        opacity: mapView === 'satellite' ? 0.3 : 0.2
+                        backgroundImage: `url(${(() => {
+                          const centerTile = getTileCoords(mapCenter.lat, mapCenter.lng, mapZoom);
+                          let tileUrl = tileServers[mapView];
+                          tileUrl = tileUrl.replace('{s}', getSubdomain(0));
+                          tileUrl = tileUrl.replace('{z}', mapZoom.toString());
+                          tileUrl = tileUrl.replace('{x}', centerTile.x.toString());
+                          tileUrl = tileUrl.replace('{y}', centerTile.y.toString());
+                          return tileUrl;
+                        })()})`,
+                        backgroundSize: '400px 400px',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                        opacity: 0.8
                       }}
-                    ></div>
+                    />
                     
-                    {/* Satellite texture overlay */}
-                    {mapView === 'satellite' && (
-                      <div 
-                        className="absolute inset-0 opacity-30"
-                        style={{
-                          backgroundImage: `
-                            repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.1) 10px, rgba(0,0,0,0.1) 20px),
-                            repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(255,255,255,0.05) 10px, rgba(255,255,255,0.05) 20px)
-                          `
-                        }}
-                      ></div>
-                    )}
+                    {/* Map attribution */}
+                    <div className="absolute bottom-1 right-1 text-xs text-gray-500 bg-white bg-opacity-80 px-2 py-1 rounded">
+                      {mapView === 'satellite' ? '© Esri' : mapView === 'terrain' ? '© OpenTopoMap' : '© OpenStreetMap'}
+                    </div>
                     
                     {/* SVG for drawing polygon and markers */}
                     <svg 
