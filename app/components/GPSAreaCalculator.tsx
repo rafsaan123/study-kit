@@ -899,7 +899,6 @@ const GPSAreaCalculator = () => {
                                 fontSize="10"
                                 fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(55, 65, 81, 0.8)'}
                                 fontWeight="500"
-                                style={mapView === 'satellite' ? { textShadow: '1px 1px 2px rgba(0,0,0,0.8)' } : {}}
                               >
                                 {index + 1}
                               </text>
@@ -909,7 +908,6 @@ const GPSAreaCalculator = () => {
                                 y={point.y + 4}
                                 fontSize="8"
                                 fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(107, 114, 128, 0.7)'}
-                                style={mapView === 'satellite' ? { textShadow: '1px 1px 2px rgba(0,0,0,0.8)' } : {}}
                               >
                                 {parsedCoords[index].lat.toFixed(4)}°N
                               </text>
@@ -918,7 +916,6 @@ const GPSAreaCalculator = () => {
                                 y={point.y + 12}
                                 fontSize="8"
                                 fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(107, 114, 128, 0.7)'}
-                                style={mapView === 'satellite' ? { textShadow: '1px 1px 2px rgba(0,0,0,0.8)' } : {}}
                               >
                                 {parsedCoords[index].lng.toFixed(4)}°E
                               </text>
