@@ -52,6 +52,27 @@ const GPSAreaCalculator = () => {
   // Google Maps API Key (replace with your actual API key)
   const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyA_3dQD-PuWjQPizAIoK0JCcKLJZGfqBqY';
 
+  // Helper function to create marker content for AdvancedMarkerElement
+  const createMarkerContent = (number: number) => {
+    const element = document.createElement('div');
+    element.style.cssText = `
+      width: 20px;
+      height: 20px;
+      background-color: #ef4444;
+      border: 3px solid white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      color: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    `;
+    element.textContent = number.toString();
+    return element;
+  };
+
   // Load Google Maps API
   useEffect(() => {
     const loadGoogleMaps = () => {
@@ -65,7 +86,7 @@ const GPSAreaCalculator = () => {
       existingScripts.forEach(script => script.remove());
 
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry&callback=initGoogleMap`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry,marker&callback=initGoogleMap`;
       script.async = true;
       script.defer = true;
       
@@ -125,24 +146,36 @@ const GPSAreaCalculator = () => {
         const markers = googleMap.markers || [];
         markers.forEach((marker: any) => marker.setMap(null));
 
-        // Add new markers
+        // Add new markers using AdvancedMarkerElement (recommended)
         const newMarkers: any[] = [];
         parsedCoords.forEach((coord, index) => {
-          const marker = new window.google.maps.Marker({
-            position: { lat: coord.lat, lng: coord.lng },
-            map: googleMap,
-            title: `Point ${index + 1}: ${coord.lat.toFixed(6)}°N, ${coord.lng.toFixed(6)}°E`,
-            label: `${index + 1}`,
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: 8,
-              fillColor: '#ef4444',
-              fillOpacity: 0.9,
-              strokeColor: '#ffffff',
-              strokeWeight: 3
-            }
-          });
-          newMarkers.push(marker);
+          // Try to use AdvancedMarkerElement if available, fallback to regular Marker
+          if (window.google.maps.marker && window.google.maps.marker.AdvancedMarkerElement) {
+            const marker = new window.google.maps.marker.AdvancedMarkerElement({
+              position: { lat: coord.lat, lng: coord.lng },
+              map: googleMap,
+              title: `Point ${index + 1}: ${coord.lat.toFixed(6)}°N, ${coord.lng.toFixed(6)}°E`,
+              content: createMarkerContent(index + 1)
+            });
+            newMarkers.push(marker);
+          } else {
+            // Fallback to regular Marker
+            const marker = new window.google.maps.Marker({
+              position: { lat: coord.lat, lng: coord.lng },
+              map: googleMap,
+              title: `Point ${index + 1}: ${coord.lat.toFixed(6)}°N, ${coord.lng.toFixed(6)}°E`,
+              label: `${index + 1}`,
+              icon: {
+                path: window.google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: '#ef4444',
+                fillOpacity: 0.9,
+                strokeColor: '#ffffff',
+                strokeWeight: 3
+              }
+            });
+            newMarkers.push(marker);
+          }
         });
 
         // Store markers reference
