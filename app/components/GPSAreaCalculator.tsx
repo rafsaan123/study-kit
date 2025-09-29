@@ -57,39 +57,26 @@ const GPSAreaCalculator = () => {
     return subdomains[index % subdomains.length];
   };
 
-  // Convert coordinates to screen points for map drawing (simplified for single tile)
+  // Convert GPS coords to screen pixels relative to map center
   const coordsToScreenPoints = (coords: GPSCoordinate[]): { x: number; y: number }[] => {
     if (coords.length === 0) return [];
 
-    // Calculate bounds of all coordinates
-    const bounds = coords.reduce((acc, coord) => ({
-      minLat: Math.min(acc.minLat, coord.lat),
-      maxLat: Math.max(acc.maxLat, coord.lat),
-      minLng: Math.min(acc.minLng, coord.lng),
-      maxLng: Math.max(acc.maxLng, coord.lng)
-    }), {
-      minLat: coords[0].lat,
-      maxLat: coords[0].lat,
-      minLng: coords[0].lng,
-      maxLng: coords[0].lng
+    // Calculate tile size in degrees for current zoom level
+    const tileSizeDegreesLat = 180 / Math.pow(2, mapZoom); // Full tile height in degrees
+    const tileSizeDegreesLng = 360 / Math.pow(2, mapZoom); // Full tile width in degrees
+    
+    // Calculate the map extent in degrees (what's visible in our 400x400 canvas)
+    // Assuming we show approximately 1 tile worth of coverage
+    const mapExtentLat = tileSizeDegreesLat;
+    const mapExtentLng = tileSizeDegreesLng;
+    
+    return coords.map(coord => {
+      // Convert lat/lng to pixel position relative to map center
+      const x = 200 + ((coord.lng - mapCenter.lng) / mapExtentLng) * 400;
+      const y = 200 - ((coord.lat - mapCenter.lat) / mapExtentLat) * 400; // Flip Y for screen coords
+      
+      return { x, y };
     });
-
-    // Calculate the map extent based on bounds
-    const latRange = bounds.maxLat - bounds.minLat;
-    const lngRange = bounds.maxLng - bounds.minLng;
-    const maxRange = Math.max(latRange, lngRange, 0.001);
-    
-    // Scale to fit within 400x400 SVG canvas
-    const scale = 350 / maxRange; // Leave some margin
-    
-    // Calculate center point for scaling
-    const centerLat = (bounds.minLat + bounds.maxLat) / 2;
-    const centerLng = (bounds.minLng + bounds.maxLng) / 2;
-    
-    return coords.map(coord => ({
-      x: 200 + (coord.lng - centerLng) * scale,
-      y: 200 - (coord.lat - centerLat) * scale // Flip Y axis for screen coordinates
-    }));
   };
 
   // Parse GPS coordinate string to decimal degrees
@@ -282,7 +269,7 @@ const GPSAreaCalculator = () => {
       console.log('Coordinates in meters:', metersCoords);
       console.log('Calculated area in m²:', areaInSquareMeters);
 
-      // Update map center for GPS coordinates
+      // Update map center and zoom for GPS coordinates
       if (inputMode === 'gps') {
         try {
           const parsedCoords: GPSCoordinate[] = [];
@@ -294,7 +281,34 @@ const GPSAreaCalculator = () => {
             // Calculate centroid of the polygon
             const avgLat = parsedCoords.reduce((sum, coord) => sum + coord.lat, 0) / parsedCoords.length;
             const avgLng = parsedCoords.reduce((sum, coord) => sum + coord.lng, 0) / parsedCoords.length;
+            
+            // Calculate suitable zoom level based on area size
+            const bounds = parsedCoords.reduce((acc, coord) => ({
+              minLat: Math.min(acc.minLat, coord.lat),
+              maxLat: Math.max(acc.maxLat, coord.lat),
+              minLng: Math.min(acc.minLng, coord.lng),
+              maxLng: Math.max(acc.maxLng, coord.lng)
+            }), {
+              minLat: parsedCoords[0].lat,
+              maxLat: parsedCoords[0].lat,
+              minLng: parsedCoords[0].lng,
+              maxLng: parsedCoords[0].lng
+            });
+            
+            const latRange = bounds.maxLat - bounds.minLat;
+            const lngRange = bounds.maxLng - bounds.minLng;
+            const maxRange = Math.max(latRange, lngRange);
+            
+            // Adjust zoom based on area size (smaller area = higher zoom)
+            let suitableZoom = 15; // Default zoom
+            if (maxRange < 0.001) suitableZoom = 18; // Very small area
+            else if (maxRange < 0.01) suitableZoom = 16; // Small area
+            else if (maxRange < 0.1) suitableZoom = 14; // Medium area
+            else if (maxRange < 0.5) suitableZoom = 13; // Large area
+            else suitableZoom = 12; // Very large area
+            
             setMapCenter({ lat: avgLat, lng: avgLng });
+            setMapZoom(suitableZoom);
           }
         } catch (err) {
           // Keep default center if parsing fails
@@ -821,7 +835,7 @@ const GPSAreaCalculator = () => {
                         📍 Center: {mapCenter.lat.toFixed(6)}°N, {mapCenter.lng.toFixed(6)}°E
                       </span>
                       <span className="text-xs text-gray-600">
-                        {gpsCoordinates.length} coordinates plotted | View: {mapView === 'satellite' ? '🛰️ Satellite' : mapView === 'terrain' ? '⛰️ Terrain' : '🗺️ Standard'}
+                        {gpsCoordinates.length} coordinates plotted | Zoom: {mapZoom} | View: {mapView === 'satellite' ? '🛰️ Satellite' : mapView === 'terrain' ? '⛰️ Terrain' : '🗺️ Standard'}
                       </span>
                     </div>
                   </div>
