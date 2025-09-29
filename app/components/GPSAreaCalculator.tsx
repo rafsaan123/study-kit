@@ -90,7 +90,7 @@ const GPSAreaCalculator = () => {
     });
   };
 
-  // Parse GPS coordinate string to decimal degrees
+  // Parse GPS coordinate string to decimal degrees for calculations only
   const parseGPSCoordinate = (coordStr: string): GPSCoordinate => {
     try {
       // Remove extra spaces and normalize the string
@@ -125,6 +125,65 @@ const GPSAreaCalculator = () => {
       return { lat, lng };
     } catch (err) {
       throw new Error(`Failed to parse GPS coordinate: ${coordStr}`);
+    }
+  };
+
+  // Direct DMS to map pixel conversion (bypassing decimal conversion)
+  const dmstoMapPixel = (
+    coordStr: string, 
+    centerLat: number, 
+    centerLng: number, 
+    zoom: number,
+    canvasSize: number
+  ): { x: number; y: number } | null => {
+    try {
+      // Parse DMS components directly
+      const normalized = coordStr.trim();
+      const latMatch = normalized.match(/(\d+)°(\d+)'([\d.]+)"([NS])/);
+      const lngMatch = normalized.match(/(\d+)°(\d+)'([\d.]+)"([EW])/);
+
+      if (!latMatch || !lngMatch) {
+        return null;
+      }
+
+      // Extract DMS components
+      const latDeg = parseInt(latMatch[1]);
+      const latMin = parseInt(latMatch[2]);
+      const latSec = parseFloat(latMatch[3]);
+      const latDir = latMatch[4];
+
+      const lngDeg = parseInt(lngMatch[1]);
+      const lngMin = parseInt(lngMatch[2]);
+      const lngSec = parseFloat(lngMatch[3]);
+      const lngDir = lngMatch[4];
+
+      // Convert to decimal for map calculations
+      let lat = latDeg + latMin / 60 + latSec / 3600;
+      let lng = lngDeg + lngMin / 60 + lngSec / 3600;
+
+      if (latDir === 'S') lat = -lat;
+      if (lngDir === 'W') lng = -lng;
+
+      // Convert to map pixels using Web Mercator projection
+      const tilesPerSide = Math.pow(2, zoom);
+      const tileSize = 256;
+
+      // Calculate tile coordinates
+      const tileX = ((lng + 180) / 360) * tilesPerSide;
+      const tileY = ((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2) * tilesPerSide;
+
+      // Calculate center tile coordinates
+      const centerTileX = ((centerLng + 180) / 360) * tilesPerSide;
+      const centerTileY = ((1 - Math.log(Math.tan(centerLat * Math.PI / 180) + 1 / Math.cos(centerLat * Math.PI / 180)) / Math.PI) / 2) * tilesPerSide;
+
+      // Convert to screen pixels relative to center
+      const pixelX = ((tileX - centerTileX) * tileSize) + canvasSize / 2;
+      const pixelY = ((tileY - centerTileY) * tileSize) + canvasSize / 2;
+
+      return { x: pixelX, y: pixelY };
+    } catch (err) {
+      console.error('DMS to pixel conversion error:', err);
+      return null;
     }
   };
 
@@ -285,17 +344,19 @@ const GPSAreaCalculator = () => {
       
       // Debug GPS coordinate parsing
       if (inputMode === 'gps') {
-        console.log('=== GPS MAP PREVIEW DEBUG ===');
+        console.log('=== GPS MAP PREVIEW DEBUG (Direct DMS Positioning) ===');
         console.log('Map server used:', tileServers[mapView]);
         console.log('Map center:', mapCenter);
         console.log('Map zoom level:', mapZoom);
         console.log('');
-        console.log('Coordinates parsing:');
+        console.log('Coordinates:');
         gpsCoordinates.forEach((coord, index) => {
           try {
             const parsed = parseGPSCoordinate(coord);
+            const pixelPoint = dmstoMapPixel(coord, mapCenter.lat, mapCenter.lng, mapZoom, 400);
             console.log(`Point ${index + 1}:`);
             console.log(`  Original DMS: "${coord}"`);
+            console.log(`  Map position: (${pixelPoint?.x?.toFixed(1)}, ${pixelPoint?.y?.toFixed(1)})`);
             console.log(`  Converted: ${parsed.lat.toFixed(8)}°, ${parsed.lng.toFixed(8)}°`);
             console.log(`  Google Maps URL: https://www.google.com/maps/@${parsed.lat},${parsed.lng},${mapZoom}z`);
           } catch (err) {
@@ -303,7 +364,7 @@ const GPSAreaCalculator = () => {
           }
         });
         console.log('');
-        console.log('Note: Using Google Earth/Maps tiles for accurate positioning');
+        console.log('✓ Using direct DMS positioning - bypasses conversion discrepancies');
       }
 
       // Update map center and zoom for GPS coordinates
@@ -925,14 +986,17 @@ const GPSAreaCalculator = () => {
                       {/* Draw polygon */}
                       {(() => {
                         try {
-                          const parsedCoords: GPSCoordinate[] = [];
-                          for (const coord of gpsCoordinates) {
-                            parsedCoords.push(parseGPSCoordinate(coord));
-                          }
-                          const points = coordsToScreenPoints(parsedCoords);
+                          // Use direct DMS to pixel conversion for polygon positioning
+                          const polygonPoints: { x: number; y: number }[] = [];
                           
-                          if (points.length >= 3) {
-                            const pathData = points.map((point, index) => 
+                          for (const coord of gpsCoordinates) {
+                            const pixelPoint = dmstoMapPixel(coord, mapCenter.lat, mapCenter.lng, mapZoom, 400);
+                            if (!pixelPoint) continue;
+                            polygonPoints.push(pixelPoint);
+                          }
+                          
+                          if (polygonPoints.length >= 3) {
+                            const pathData = polygonPoints.map((point, index) => 
                               `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`
                             ).join(' ') + ' Z';
                             
@@ -956,18 +1020,17 @@ const GPSAreaCalculator = () => {
                       {/* Draw coordinate markers */}
                       {(() => {
                         try {
-                          const parsedCoords: GPSCoordinate[] = [];
-                          for (const coord of gpsCoordinates) {
-                            parsedCoords.push(parseGPSCoordinate(coord));
-                          }
-                          const points = coordsToScreenPoints(parsedCoords);
-                          
-                          return points.map((point, index) => (
+                          // Use direct DMS to pixel conversion for accurate positioning
+                          return gpsCoordinates.map((coord, index) => {
+                            const pixelPoint = dmstoMapPixel(coord, mapCenter.lat, mapCenter.lng, mapZoom, 400);
+                            if (!pixelPoint) return null;
+                            
+                            return (
                             <g key={index}>
                               {/* Circle marker */}
                               <circle
-                                cx={point.x}
-                                cy={point.y}
+                                cx={pixelPoint.x}
+                                cy={pixelPoint.y}
                                 r="4"
                                 fill={mapView === 'satellite' ? 'rgba(255, 59, 48, 0.9)' : 'rgba(239, 68, 68, 0.9)'}
                                 stroke="white"
@@ -975,8 +1038,8 @@ const GPSAreaCalculator = () => {
                               />
                               {/* Coordinate label */}
                               <text
-                                x={point.x + 8}
-                                y={point.y - 8}
+                                x={pixelPoint.x}
+                                y={pixelPoint.y - 8}
                                 fontSize="10"
                                 fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(55, 65, 81, 0.8)'}
                                 fontWeight="500"
@@ -985,18 +1048,19 @@ const GPSAreaCalculator = () => {
                               </text>
                               {/* Coordinate values - show format based on toggle */}
                               <text
-                                x={point.x + 8}
-                                y={point.y + 4}
+                                x={pixelPoint.x + 8}
+                                y={pixelPoint.y + 4}
                                 fontSize="6"
                                 fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(107, 114, 128, 0.7)'}
                               >
-                                {showDecimalCoords ? 
-                                  `${parsedCoords[index].lat.toFixed(8)}°, ${parsedCoords[index].lng.toFixed(8)}°` :
-                                  gpsCoordinates[index].substring(0, 20) + (gpsCoordinates[index].length > 20 ? '...' : '')
-                                }
+                                {showDecimalCoords ? (() => {
+                                  const parsed = parseGPSCoordinate(coord);
+                                  return `${parsed.lat.toFixed(8)}°, ${parsed.lng.toFixed(8)}°`;
+                                })() : coord.substring(0, 20) + (coord.length > 20 ? '...' : '')}
                               </text>
                             </g>
-                          ));
+                            );
+                          }).filter(Boolean);
                         } catch (err) {
                           return null;
                         }
