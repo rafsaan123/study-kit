@@ -91,33 +91,6 @@ const GPSAreaCalculator = () => {
     });
   };
 
-  // Test coordinate conversion against known Google Maps coordinates
-  const testCoordinateConversion = (dmsCoord: string, expectedLat: number, expectedLng: number, description: string) => {
-    try {
-      const parsed = parseGPSCoordinate(dmsCoord);
-      const latDiff = Math.abs(parsed.lat - expectedLat);
-      const lngDiff = Math.abs(parsed.lng - expectedLng);
-      const latDiffMeters = latDiff * 111000; // Approximate meters per degree
-      const lngDiffMeters = lngDiff * 111000 * Math.cos(parsed.lat * Math.PI / 180);
-      
-      console.log(`\n=== ${description} ===`);
-      console.log(`Input DMS: ${dmsCoord}`);
-      console.log(`Our conversion: ${parsed.lat.toFixed(8)}, ${parsed.lng.toFixed(8)}`);
-      console.log(`Google Maps expected: ${expectedLat.toFixed(8)}, ${expectedLng.toFixed(8)}`);
-      console.log(`Difference: Lat ${latDiffMeters.toFixed(1)}m, Lng ${lngDiffMeters.toFixed(1)}m`);
-      
-      if (latDiffMeters > 100 || lngDiffMeters > 100) {
-        console.log(`❌ LARGE DISCREPANCY: ${Math.max(latDiffMeters, lngDiffMeters).toFixed(1)}m off`);
-      } else {
-        console.log(`✅ Conversion accurate: Within ${Math.max(latDiffMeters, lngDiffMeters).toFixed(1)}m`);
-      }
-      
-      return parsed;
-    } catch (err) {
-      console.log(`❌ Parse error for ${description}: ${err}`);
-      return null;
-    }
-  };
 
   // Parse GPS coordinate string to decimal degrees for calculations only
   const parseGPSCoordinate = (coordStr: string): GPSCoordinate => {
@@ -144,9 +117,9 @@ const GPSAreaCalculator = () => {
       const lngSec = parseFloat(lngMatch[3]);
       const lngDir = lngMatch[4];
 
-      // Calculate with high precision
-      let lat = latDeg + (latMin + latSec / 60) / 60;
-      let lng = lngDeg + (lngMin + lngSec / 60) / 60;
+      // Standard DMS to decimal conversion
+      let lat = latDeg + latMin / 60 + latSec / 3600;
+      let lng = lngDeg + lngMin / 60 + lngSec / 3600;
 
       if (latDir === 'S') lat = -lat;
       if (lngDir === 'W') lng = -lng;
@@ -361,19 +334,6 @@ const GPSAreaCalculator = () => {
       console.log('Map center:', mapCenter);
       console.log('Map zoom:', mapZoom);
       
-      // Test conversion against known coordinates
-      console.log('🧪 TESTING COORDINATE CONVERSION ACCURACY');
-      testCoordinateConversion(
-        "23°42'36\"N 90°25'12\"E", 
-        23.7100, 90.4200, 
-        "Dhaka University (known reference)"
-      );
-      
-      testCoordinateConversion(
-        "24°24'11.9\"N 88°37'35.0\"E", 
-        24.403306, 88.626389, 
-        "Your specific coordinate"
-      );
 
       // Debug GPS coordinate parsing
       if (inputMode === 'gps') {
@@ -1014,20 +974,6 @@ const GPSAreaCalculator = () => {
                 }`}
               >
                 {showDecimalCoords ? 'Show DMS' : 'Show Decimal'}
-              </button>
-              <button
-                onClick={() => {
-                  console.log('🧪 MANUAL COORDINATE TEST');
-                  testCoordinateConversion(
-                    "24°24'11.9\"N 88°37'35.0\"E", 
-                    24.4033056, 88.623814, 
-                    "Expected Google Maps location"
-                  );
-                  alert('Check console for detailed conversion analysis!');
-                }}
-                className="px-2 py-1 rounded-md bg-yellow-100 text-yellow-700 hover:bg-yellow-200 text-xs"
-              >
-                🧪 Test Location
               </button>
                   <button
                     onClick={() => setShowMap(!showMap)}
