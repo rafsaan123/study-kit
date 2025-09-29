@@ -119,6 +119,9 @@ const GPSAreaCalculator = () => {
           disableDefaultUI: false,
           zoomControl: true,
           mapTypeControl: true,
+          mapTypeControlOptions: {
+            mapTypeIds: ['roadmap', 'satellite', 'terrain']
+          },
           scaleControl: true,
           streetViewControl: true,
           rotateControl: true,
@@ -133,6 +136,14 @@ const GPSAreaCalculator = () => {
       }
     }
   }, [mapLoaded, mapCenter, mapZoom, mapView, googleMap]);
+
+  // Update map type when view changes
+  useEffect(() => {
+    if (googleMap) {
+      const mapTypeId = mapView === 'satellite' ? 'satellite' : mapView === 'terrain' ? 'terrain' : 'roadmap';
+      googleMap.setMapTypeId(mapTypeId);
+    }
+  }, [googleMap, mapView]);
 
   // Update map when coordinates change
   useEffect(() => {
