@@ -50,7 +50,7 @@ const GPSAreaCalculator = () => {
   const mapRef = useRef<HTMLDivElement>(null);
 
   // Google Maps API Key (replace with your actual API key)
-  const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBFw0Qbyq9zTFTd-tUY6dOcT-4f9VzT8kU';
+  const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyA_3dQD-PuWjQPizAIoK0JCcKLJZGfqBqY';
 
   // Load Google Maps API with error handling
   useEffect(() => {
