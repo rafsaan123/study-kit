@@ -281,6 +281,19 @@ const GPSAreaCalculator = () => {
       console.log('Calculated area in m²:', areaInSquareMeters);
       console.log('Map center:', mapCenter);
       console.log('Map zoom:', mapZoom);
+      
+      // Debug GPS coordinate parsing
+      if (inputMode === 'gps') {
+        console.log('Debug GPS parsing:');
+        gpsCoordinates.forEach((coord, index) => {
+          try {
+            const parsed = parseGPSCoordinate(coord);
+            console.log(`Coord ${index + 1}: "${coord}" -> ${parsed.lat.toFixed(8)}, ${parsed.lng.toFixed(8)}`);
+          } catch (err) {
+            console.log(`Coord ${index + 1}: "${coord}" -> ERROR`);
+          }
+        });
+      }
 
       // Update map center and zoom for GPS coordinates
       if (inputMode === 'gps') {
@@ -628,9 +641,12 @@ const GPSAreaCalculator = () => {
           {gpsCoordinates.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <p>No GPS coordinates. Click &quot;Load Sample&quot; or add coordinates manually.</p>
-              <p className="text-sm mt-2 text-gray-400">
-                Format: 24°24&apos;10.5&quot;N 88°37&apos;34.7&quot;E
-              </p>
+                          <p className="text-sm mt-2 text-gray-400">
+                            Format: 24°24&apos;10.5&quot;N 88°37&apos;34.7&quot;E
+                          </p>
+                          <p className="text-xs mt-1 text-yellow-600">
+                            Note: Google Maps may show slightly different coordinates due to coordinate system differences
+                          </p>
             </div>
           ) : (
             <div className="space-y-3">
