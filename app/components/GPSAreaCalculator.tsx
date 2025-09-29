@@ -68,24 +68,23 @@ const GPSAreaCalculator = () => {
     return { x, y };
   };
 
-  // Convert GPS coords to screen pixels
+  // Simple GPS to screen pixel conversion
   const coordsToScreenPoints = (coords: GPSCoordinate[]): { x: number; y: number }[] => {
     if (coords.length === 0) return [];
 
-    // Project map center to pixel coordinates
-    const centerPx = projectMercator(mapCenter.lat, mapCenter.lng, mapZoom);
-    
-    // Calculate scale factor for our 400x400 viewport
-    // Each level of zoom doubles the scale, level 15 = 2^15 = 32768 tiles wide
-    const scale = 400 / 256; // 400px canvas / 256px tile = scale factor
-    
     return coords.map(coord => {
-      // Project coordinate to pixel coordinates
-      const coordPx = projectMercator(coord.lat, coord.lng, mapZoom);
+      // Calculate degrees difference from map center
+      const deltaLng = coord.lng - mapCenter.lng;
+      const deltaLat = coord.lat - mapCenter.lat;
       
-      // Calculate position relative to center on our screen
-      const x = 200 + (coordPx.x - centerPx.x) * scale;
-      const y = 200 + (coordPx.y - centerPx.y) * scale;
+      // Convert to screen pixels based on zoom level
+      // At zoom 15: approximately 256 pixels per tile, where each tile covers a small area
+      // Roughly 1 degree = ~100 pixels at zoom 15, adjust for zoom
+      const pixelPerDegree = Math.pow(2, mapZoom - 11) * 5; // Adjust based on zoom
+      
+      // Calculate screen position (canvas center is 200, 200)
+      const x = 200 + (deltaLng * pixelPerDegree);
+      const y = 200 - (deltaLat * pixelPerDegree); // Negative because lat increases upward
       
       return { x, y };
     });
