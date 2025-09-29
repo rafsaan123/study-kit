@@ -998,7 +998,7 @@ const GPSAreaCalculator = () => {
                   <div className="bg-green-50 p-3 border-b border-gray-200">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-green-800 font-medium">
-                        📍 Center: {mapCenter.lat.toFixed(8)}°N, {mapCenter.lng.toFixed(8)}°E
+                        📍 Center: {mapCenter.lat.toFixed(6)}°N, {mapCenter.lng.toFixed(6)}°E
                       </span>
                       <span className="text-xs text-gray-600">
                         {gpsCoordinates.length} coordinates plotted | View: {mapView === 'satellite' ? '🛰️ Satellite' : mapView === 'terrain' ? '⛰️ Terrain' : '🗺️ OpenStreetMap'}
@@ -1076,18 +1076,25 @@ const GPSAreaCalculator = () => {
                           
                           if (parsedCoords.length === 0) return null;
                           
-                          // Calculate map bounds for positioning
+                          // Calculate map bounds for positioning with proper margins
                           const lats = parsedCoords.map(c => c.lat);
                           const lngs = parsedCoords.map(c => c.lng);
+                          const latRange = Math.max(...lats) - Math.min(...lats);
+                          const lngRange = Math.max(...lngs) - Math.min(...lngs);
+                          
+                          // Add 20% margin to bounds
+                          const latMargin = latRange > 0 ? latRange * 0.2 : 0.01;
+                          const lngMargin = lngRange > 0 ? lngRange * 0.2 : 0.01;
+                          
                           const bounds = {
-                            minLat: Math.min(...lats) - (Math.max(...lats) - Math.min(...lats)) * 0.1,
-                            maxLat: Math.max(...lats) + (Math.max(...lats) - Math.min(...lats)) * 0.1,
-                            minLng: Math.min(...lngs) - (Math.max(...lngs) - Math.min(...lngs)) * 0.1,
-                            maxLng: Math.max(...lngs) + (Math.max(...lngs) - Math.min(...lngs)) * 0.1
+                            minLat: Math.min(...lats) - latMargin,
+                            maxLat: Math.max(...lats) + latMargin,
+                            minLng: Math.min(...lngs) - lngMargin,
+                            maxLng: Math.max(...lngs) + lngMargin
                           };
                           
                           return parsedCoords.map((coord, index) => {
-                            // Convert lat/lng to screen coordinates
+                            // Convert lat/lng to screen coordinates with proper scaling
                             const x = ((coord.lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * 400;
                             const y = ((bounds.maxLat - coord.lat) / (bounds.maxLat - bounds.minLat)) * 400;
                             
@@ -1131,7 +1138,7 @@ const GPSAreaCalculator = () => {
                                       fontSize="8"
                                       fill="white"
                                     >
-                                      {coord.lat.toFixed(6)}°, {coord.lng.toFixed(6)}°
+                                      {coord.lat.toFixed(6)}°N, {coord.lng.toFixed(6)}°E
                                     </text>
                                   </g>
                                 )}
@@ -1163,8 +1170,28 @@ const GPSAreaCalculator = () => {
                         )}
                       </div>
                       <div className={`text-xs ${mapView === 'satellite' ? 'text-gray-300' : 'text-gray-600'} mt-2`}>
-                        Center: {mapCenter.lat.toFixed(6)}°, {mapCenter.lng.toFixed(6)}° | Zoom: {mapZoom}
+                        Center: {mapCenter.lat.toFixed(6)}°N, {mapCenter.lng.toFixed(6)}°E | Zoom: {mapZoom}
                       </div>
+                    </div>
+                    
+                    {/* Debug info */}
+                    <div className="absolute bottom-1 left-1 text-xs text-gray-500 bg-white bg-opacity-80 px-2 py-1 rounded">
+                      {(() => {
+                        try {
+                          const parsedCoords: GPSCoordinate[] = [];
+                          for (const coord of gpsCoordinates) {
+                            parsedCoords.push(parseGPSCoordinate(coord));
+                          }
+                          if (parsedCoords.length > 0) {
+                            const lats = parsedCoords.map(c => c.lat);
+                            const lngs = parsedCoords.map(c => c.lng);
+                            return `Bounds: ${Math.min(...lats).toFixed(4)}-${Math.max(...lats).toFixed(4)}N, ${Math.min(...lngs).toFixed(4)}-${Math.max(...lngs).toFixed(4)}E`;
+                          }
+                          return 'No coordinates';
+                        } catch (err) {
+                          return 'Parse error';
+                        }
+                      })()}
                     </div>
                     
                     {/* Map attribution */}
