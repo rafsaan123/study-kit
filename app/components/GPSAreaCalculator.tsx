@@ -804,9 +804,8 @@ const GPSAreaCalculator = () => {
                           linear-gradient(45deg, rgba(34, 197, 94, 0.05) 25%, transparent 25%),
                           linear-gradient(-45deg, rgba(59, 130, 246, 0.05) 25%, transparent 25%)
                         `,
-                        backgroundColor: mapView === 'satellite' ? '#1a2f1a' : ''
+                        backgroundColor: '#f0f9f0'
                       }}
-                      className={mapView === 'standard' ? 'bg-gradient-to-br from-green-100 via-green-50 to-blue-50' : ''}
                     ></div>
                     
                     {/* Grid overlay */}
