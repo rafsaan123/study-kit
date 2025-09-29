@@ -68,23 +68,29 @@ const GPSAreaCalculator = () => {
     return { x, y };
   };
 
-  // Simple GPS to screen pixel conversion
+  // Direct GPS coordinate to screen pixel conversion - working approach
   const coordsToScreenPoints = (coords: GPSCoordinate[]): { x: number; y: number }[] => {
     if (coords.length === 0) return [];
 
+    // Calculate center tile coordinates
+    const centerTileCoords = getTileCoords(mapCenter.lat, mapCenter.lng, mapZoom);
+    
     return coords.map(coord => {
-      // Calculate degrees difference from map center
-      const deltaLng = coord.lng - mapCenter.lng;
-      const deltaLat = coord.lat - mapCenter.lat;
+      // Get tile coordinates for this coordinate
+      const coordTileCoords = getTileCoords(coord.lat, coord.lng, mapZoom);
       
-      // Convert to screen pixels based on zoom level
-      // At zoom 15: approximately 256 pixels per tile, where each tile covers a small area
-      // Roughly 1 degree = ~100 pixels at zoom 15, adjust for zoom
-      const pixelPerDegree = Math.pow(2, mapZoom - 11) * 5; // Adjust based on zoom
+      // Calculate tile differences
+      const deltaTileX = coordTileCoords.x - centerTileCoords.x;
+      const deltaTileY = coordTileCoords.y - centerTileCoords.y;
       
-      // Calculate screen position (canvas center is 200, 200)
-      const x = 200 + (deltaLng * pixelPerDegree);
-      const y = 200 - (deltaLat * pixelPerDegree); // Negative because lat increases upward
+      // Convert tile difference to pixel position
+      // Our map canvas is 400x400px, centered at (200, 200)
+      // Each tile difference represents 256 pixels of movement in tile space
+      // Scale this to our canvas coordinate system
+      const scale = 100; // Pixels per tile difference - adjustable for zoom
+      
+      const x = 200 + (deltaTileX * scale);
+      const y = 200 + (deltaTileY * scale);
       
       return { x, y };
     });
@@ -1008,6 +1014,7 @@ const GPSAreaCalculator = () => {
                         backgroundImage: `url(${(() => {
                           const centerTile = getTileCoords(mapCenter.lat, mapCenter.lng, mapZoom);
                           let tileUrl = tileServers[mapView];
+                          // For single tile display, show center tile
                           tileUrl = tileUrl.replace('{s}', getSubdomain(0));
                           tileUrl = tileUrl.replace('{z}', mapZoom.toString());
                           tileUrl = tileUrl.replace('{x}', centerTile.x.toString());
@@ -1017,7 +1024,7 @@ const GPSAreaCalculator = () => {
                         backgroundSize: '400px 400px',
                         backgroundPosition: 'center',
                         backgroundRepeat: 'no-repeat',
-                        opacity: 0.8
+                        opacity: 0.9
                       }}
                     />
                     
