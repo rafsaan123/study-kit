@@ -35,10 +35,10 @@ const GPSAreaCalculator = () => {
   const [mapZoom, setMapZoom] = useState(15);
   const mapRef = useRef<HTMLDivElement>(null);
 
-  // Real tile server URLs for different map types
+  // Real tile server URLs for different map types (using reliable sources)
   const tileServers = {
     standard: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    satellite: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
     terrain: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
   };
 
@@ -52,28 +52,38 @@ const GPSAreaCalculator = () => {
   // Get tile server subdomains (for load balancing)
   const getSubdomain = (index: number) => {
     const subdomains = mapView === 'standard' ? ['a', 'b', 'c'] :
-                      mapView === 'satellite' ? [''] :
+                      mapView === 'satellite' ? ['mt1', 'mt2', 'ct1', 'ct2'] :
                       ['a', 'b', 'c']; // terrain
     return subdomains[index % subdomains.length];
   };
 
-  // Convert GPS coords to screen pixels relative to map center
+  // Web Mercator projection: Convert GPS coords to pixel coordinates
+  const projectMercator = (lat: number, lng: number, zoom: number) => {
+    const tiles = Math.pow(2, zoom);
+    const circumference = 256 * tiles; // Tile size is 256px
+    const x = (lng + 180) / 360 * circumference;
+    const y = (1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2 * circumference;
+    return { x, y };
+  };
+
+  // Convert GPS coords to screen pixels
   const coordsToScreenPoints = (coords: GPSCoordinate[]): { x: number; y: number }[] => {
     if (coords.length === 0) return [];
 
-    // Calculate tile size in degrees for current zoom level
-    const tileSizeDegreesLat = 180 / Math.pow(2, mapZoom); // Full tile height in degrees
-    const tileSizeDegreesLng = 360 / Math.pow(2, mapZoom); // Full tile width in degrees
+    // Project map center to pixel coordinates
+    const centerPx = projectMercator(mapCenter.lat, mapCenter.lng, mapZoom);
     
-    // Calculate the map extent in degrees (what's visible in our 400x400 canvas)
-    // Assuming we show approximately 1 tile worth of coverage
-    const mapExtentLat = tileSizeDegreesLat;
-    const mapExtentLng = tileSizeDegreesLng;
+    // Calculate scale factor for our 400x400 viewport
+    // Each level of zoom doubles the scale, level 15 = 2^15 = 32768 tiles wide
+    const scale = 400 / 256; // 400px canvas / 256px tile = scale factor
     
     return coords.map(coord => {
-      // Convert lat/lng to pixel position relative to map center
-      const x = 200 + ((coord.lng - mapCenter.lng) / mapExtentLng) * 400;
-      const y = 200 - ((coord.lat - mapCenter.lat) / mapExtentLat) * 400; // Flip Y for screen coords
+      // Project coordinate to pixel coordinates
+      const coordPx = projectMercator(coord.lat, coord.lng, mapZoom);
+      
+      // Calculate position relative to center on our screen
+      const x = 200 + (coordPx.x - centerPx.x) * scale;
+      const y = 200 + (coordPx.y - centerPx.y) * scale;
       
       return { x, y };
     });
@@ -268,6 +278,8 @@ const GPSAreaCalculator = () => {
       // Log coordinates for debugging
       console.log('Coordinates in meters:', metersCoords);
       console.log('Calculated area in m²:', areaInSquareMeters);
+      console.log('Map center:', mapCenter);
+      console.log('Map zoom:', mapZoom);
 
       // Update map center and zoom for GPS coordinates
       if (inputMode === 'gps') {
@@ -863,7 +875,7 @@ const GPSAreaCalculator = () => {
                     
                     {/* Map attribution */}
                     <div className="absolute bottom-1 right-1 text-xs text-gray-500 bg-white bg-opacity-80 px-2 py-1 rounded">
-                      {mapView === 'satellite' ? '© Esri' : mapView === 'terrain' ? '© OpenTopoMap' : '© OpenStreetMap'}
+                      {mapView === 'satellite' ? '© Google Satellite' : mapView === 'terrain' ? '© OpenTopoMap' : '© OpenStreetMap'}
                     </div>
                     
                     {/* SVG for drawing polygon and markers */}
