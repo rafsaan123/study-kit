@@ -45,12 +45,14 @@ const GPSAreaCalculator = () => {
   const [autoParseMode, setAutoParseMode] = useState(false);
   const [googleMap, setGoogleMap] = useState<any>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState<string>('');
+  const [useFallbackMap, setUseFallbackMap] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
 
   // Google Maps API Key (replace with your actual API key)
-  const GOOGLE_MAPS_API_KEY = 'AIzaSyBFw0Qbyq9zTFTd-tUY6dOcT-4f9VzT8kU';
+  const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBFw0Qbyq9zTFTd-tUY6dOcT-4f9VzT8kU';
 
-  // Load Google Maps API
+  // Load Google Maps API with error handling
   useEffect(() => {
     const loadGoogleMaps = () => {
       if (window.google && window.google.maps) {
@@ -64,32 +66,57 @@ const GPSAreaCalculator = () => {
       script.defer = true;
       script.onload = () => {
         setMapLoaded(true);
+        setMapError('');
+      };
+      script.onerror = () => {
+        setMapError('Failed to load Google Maps API');
+        setUseFallbackMap(true);
+        setMapLoaded(true); // Set loaded to show fallback
       };
       document.head.appendChild(script);
     };
 
-    loadGoogleMaps();
-  }, []);
+    // Try to load Google Maps, fallback to OpenStreetMap if it fails
+    const timer = setTimeout(() => {
+      if (!mapLoaded) {
+        setMapError('Google Maps API timeout');
+        setUseFallbackMap(true);
+        setMapLoaded(true);
+      }
+    }, 10000); // 10 second timeout
 
-  // Initialize Google Map
+    loadGoogleMaps();
+
+    return () => clearTimeout(timer);
+  }, [GOOGLE_MAPS_API_KEY, mapLoaded]);
+
+  // Initialize Google Map or fallback
   useEffect(() => {
     if (mapLoaded && mapRef.current && !googleMap) {
-      const map = new window.google.maps.Map(mapRef.current, {
-        center: mapCenter,
-        zoom: mapZoom,
-        mapTypeId: mapView === 'satellite' ? 'satellite' : mapView === 'terrain' ? 'terrain' : 'roadmap',
-        disableDefaultUI: false,
-        zoomControl: true,
-        mapTypeControl: true,
-        scaleControl: true,
-        streetViewControl: true,
-        rotateControl: true,
-        fullscreenControl: true
-      });
-      
-      setGoogleMap(map);
+      if (!useFallbackMap && window.google && window.google.maps) {
+        try {
+          const map = new window.google.maps.Map(mapRef.current, {
+            center: mapCenter,
+            zoom: mapZoom,
+            mapTypeId: mapView === 'satellite' ? 'satellite' : mapView === 'terrain' ? 'terrain' : 'roadmap',
+            disableDefaultUI: false,
+            zoomControl: true,
+            mapTypeControl: true,
+            scaleControl: true,
+            streetViewControl: true,
+            rotateControl: true,
+            fullscreenControl: true
+          });
+          
+          setGoogleMap(map);
+        } catch (err) {
+          console.error('Google Maps initialization error:', err);
+          setMapError('Google Maps initialization failed');
+          setUseFallbackMap(true);
+        }
+      }
     }
-  }, [mapLoaded, mapCenter, mapZoom, mapView, googleMap]);
+  }, [mapLoaded, mapCenter, mapZoom, mapView, googleMap, useFallbackMap]);
 
   // Update map when coordinates change
   useEffect(() => {
@@ -1127,19 +1154,58 @@ const GPSAreaCalculator = () => {
                   
                   <div className="relative" style={{ height: '400px', backgroundColor: '#f8f9fa', borderRadius: '8px', overflow: 'hidden' }}>
                     {/* Google Maps Container */}
-                    <div 
-                      ref={mapRef}
-                      className="w-full h-full"
-                      style={{ minHeight: '400px' }}
-                    />
+                    {!useFallbackMap ? (
+                      <div 
+                        ref={mapRef}
+                        className="w-full h-full"
+                        style={{ minHeight: '400px' }}
+                      />
+                    ) : (
+                      /* Fallback OpenStreetMap */
+                      <div className="w-full h-full">
+                        <iframe
+                          src={`https://www.openstreetmap.org/export/embed.html?bbox=${(() => {
+                            const parsedCoords: GPSCoordinate[] = [];
+                            try {
+                              for (const coord of gpsCoordinates) {
+                                parsedCoords.push(parseGPSCoordinate(coord));
+                              }
+                              if (parsedCoords.length === 0) {
+                                return `${mapCenter.lng-0.01},${mapCenter.lat-0.01},${mapCenter.lng+0.01},${mapCenter.lat+0.01}`;
+                              }
+                              const lats = parsedCoords.map(c => c.lat);
+                              const lngs = parsedCoords.map(c => c.lng);
+                              const bounds = {
+                                minLng: Math.min(...lngs) - 0.001,
+                                minLat: Math.min(...lats) - 0.001,
+                                maxLng: Math.max(...lngs) + 0.001,
+                                maxLat: Math.max(...lats) + 0.001
+                              };
+                              return `${bounds.minLng},${bounds.minLat},${bounds.maxLng},${bounds.maxLat}`;
+                            } catch (err) {
+                              return `${mapCenter.lng-0.01},${mapCenter.lat-0.01},${mapCenter.lng+0.01},${mapCenter.lat+0.01}`;
+                            }
+                          })()}&layer=mapnik`}
+                          className="w-full h-full border-0"
+                          title="GPS Coordinate Map Preview"
+                        />
+                      </div>
+                    )}
                     
                     {/* Loading indicator */}
                     {!mapLoaded && (
                       <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
                         <div className="text-center">
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                          <p className="text-sm text-gray-600">Loading Google Maps...</p>
+                          <p className="text-sm text-gray-600">Loading Maps...</p>
                         </div>
+                      </div>
+                    )}
+                    
+                    {/* Error message */}
+                    {mapError && (
+                      <div className="absolute top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded text-sm">
+                        {mapError} - Using fallback map
                       </div>
                     )}
                     
@@ -1188,7 +1254,7 @@ const GPSAreaCalculator = () => {
                     
                     {/* Map attribution */}
                     <div className="absolute bottom-1 right-1 text-xs text-gray-500 bg-white bg-opacity-80 px-2 py-1 rounded">
-                      © Google Maps
+                      {useFallbackMap ? '© OpenStreetMap contributors' : '© Google Maps'}
                     </div>
                     
                     {/* Map info overlay */}
