@@ -103,7 +103,7 @@ const GPSAreaCalculator = () => {
         throw new Error('Invalid GPS coordinate format');
       }
 
-      // Convert DMS to decimal degrees
+      // Convert DMS to decimal degrees with high precision
       const latDeg = parseInt(latMatch[1]);
       const latMin = parseInt(latMatch[2]);
       const latSec = parseFloat(latMatch[3]);
@@ -114,6 +114,7 @@ const GPSAreaCalculator = () => {
       const lngSec = parseFloat(lngMatch[3]);
       const lngDir = lngMatch[4];
 
+      // Calculate with full precision - don't round
       let lat = latDeg + latMin / 60 + latSec / 3600;
       let lng = lngDeg + lngMin / 60 + lngSec / 3600;
 
@@ -461,12 +462,12 @@ const GPSAreaCalculator = () => {
         gpsCoordinates.forEach((coord, index) => {
           try {
             const parsed = parseGPSCoordinate(coord);
-            textContent += `Point ${index + 1}: ${coord} (${parsed.lat.toFixed(6)}°, ${parsed.lng.toFixed(6)}°)\n`;
+            textContent += `Point ${index + 1}: ${coord} (${parsed.lat.toFixed(8)}°, ${parsed.lng.toFixed(8)}°)\n`;
           } catch {
             textContent += `Point ${index + 1}: ${coord} (Invalid)\n`;
           }
         });
-        textContent += `\nMap Center: ${mapCenter.lat.toFixed(6)}°N, ${mapCenter.lng.toFixed(6)}°E\n`;
+        textContent += `\nMap Center: ${mapCenter.lat.toFixed(8)}°N, ${mapCenter.lng.toFixed(8)}°E\n`;
       }
       
       textContent += '\n--- AREA CALCULATIONS ---\n';
@@ -844,7 +845,7 @@ const GPSAreaCalculator = () => {
                   <div className="bg-green-50 p-3 border-b border-gray-200">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-green-800 font-medium">
-                        📍 Center: {mapCenter.lat.toFixed(6)}°N, {mapCenter.lng.toFixed(6)}°E
+                        📍 Center: {mapCenter.lat.toFixed(8)}°N, {mapCenter.lng.toFixed(8)}°E
                       </span>
                       <span className="text-xs text-gray-600">
                         {gpsCoordinates.length} coordinates plotted | Zoom: {mapZoom} | View: {mapView === 'satellite' ? '🛰️ Satellite' : mapView === 'terrain' ? '⛰️ Terrain' : '🗺️ Standard'}
@@ -952,7 +953,7 @@ const GPSAreaCalculator = () => {
                                 fontSize="8"
                                 fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(107, 114, 128, 0.7)'}
                               >
-                                {parsedCoords[index].lat.toFixed(4)}°N
+                                {parsedCoords[index].lat.toFixed(8)}°N
                               </text>
                               <text
                                 x={point.x + 8}
@@ -960,7 +961,7 @@ const GPSAreaCalculator = () => {
                                 fontSize="8"
                                 fill={mapView === 'satellite' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(107, 114, 128, 0.7)'}
                               >
-                                {parsedCoords[index].lng.toFixed(4)}°E
+                                {parsedCoords[index].lng.toFixed(8)}°E
                               </text>
                             </g>
                           ));
@@ -993,7 +994,7 @@ const GPSAreaCalculator = () => {
                               {(() => {
                                 try {
                                   const parsed = parseGPSCoordinate(coord);
-                                  return `${parsed.lat.toFixed(4)}°, ${parsed.lng.toFixed(4)}°`;
+                                  return `${parsed.lat.toFixed(8)}°, ${parsed.lng.toFixed(8)}°`;
                                 } catch (err) {
                                   return 'Invalid';
                                 }
