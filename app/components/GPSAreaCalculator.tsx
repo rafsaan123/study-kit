@@ -386,13 +386,44 @@ const GPSAreaCalculator = () => {
             const lngRange = bounds.maxLng - bounds.minLng;
             const maxRange = Math.max(latRange, lngRange);
             
-            // Adjust zoom based on area size (smaller area = higher zoom)
+            // Calculate margins for better visibility
+            const latMargin = latRange * 0.2; // 20% margin
+            const lngMargin = lngRange * 0.2; // 20% margin
+            const marginAdjustedRange = Math.max(latRange + latMargin, lngRange + lngMargin);
+            
+            // More comprehensive zoom adjustment based on coordinate span
             let suitableZoom = 15; // Default zoom
-            if (maxRange < 0.001) suitableZoom = 18; // Very small area
-            else if (maxRange < 0.01) suitableZoom = 16; // Small area
-            else if (maxRange < 0.1) suitableZoom = 14; // Medium area
-            else if (maxRange < 0.5) suitableZoom = 13; // Large area
-            else suitableZoom = 12; // Very large area
+            
+            if (marginAdjustedRange < 0.0001) {
+              suitableZoom = 19; // Tiny area (sub-meter)
+            } else if (marginAdjustedRange < 0.001) {
+              suitableZoom = 17; // Very small area (~100m)
+            } else if (marginAdjustedRange < 0.01) {
+              suitableZoom = 15; // Small area (~1km)
+            } else if (marginAdjustedRange < 0.05) {
+              suitableZoom = 13; // Medium area (~5km)
+            } else if (marginAdjustedRange < 0.1) {
+              suitableZoom = 12; // Large area (~10km)
+            } else if (marginAdjustedRange < 0.5) {
+              suitableZoom = 10; // Very large area (~50km)
+            } else if (marginAdjustedRange < 1.0) {
+              suitableZoom = 8; // Huge area (~100km)
+            } else {
+              suitableZoom = 6; // Massive area (state/country level)
+            }
+            
+            // Ensure zoom is within Google Maps limits
+            suitableZoom = Math.max(1, Math.min(20, suitableZoom));
+            
+            // Debug zoom calculation
+            console.log('=== MAP ZOOM CALCULATION ===');
+            console.log(`Coordinate bounds: lat ${bounds.minLat.toFixed(6)} to ${bounds.maxLat.toFixed(6)}, lng ${bounds.minLng.toFixed(6)} to ${bounds.maxLng.toFixed(6)}`);
+            console.log(`Lat range: ${latRange.toFixed(6)}, Lng range: ${lngRange.toFixed(6)}`);
+            console.log(`Max range (degrees): ${maxRange.toFixed(6)}`);
+            console.log(`Max range (meters): ~${Math.round(maxRange * 111000)}m`);
+            console.log(`Margin adjusted range: ${marginAdjustedRange.toFixed(6)}`);
+            console.log(`Selected zoom level: ${suitableZoom}`);
+            console.log(`Map center: ${avgLat.toFixed(6)}, ${avgLng.toFixed(6)}`);
             
             setMapCenter({ lat: avgLat, lng: avgLng });
             setMapZoom(suitableZoom);
