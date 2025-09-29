@@ -37,11 +37,11 @@ const GPSAreaCalculator = () => {
   const [autoParseMode, setAutoParseMode] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
 
-  // Google Earth/Maps tile servers for accurate coordinate matching
+  // Reliable mapping tile servers
   const tileServers = {
-    standard: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+    standard: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     satellite: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-    terrain: 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}'
+    terrain: 'https://tile.opentopomap.org/{z}/{x}/{y}.png'
   };
 
   // Convert lat/lng/z to tile coordinates
@@ -144,9 +144,9 @@ const GPSAreaCalculator = () => {
       const lngSec = parseFloat(lngMatch[3]);
       const lngDir = lngMatch[4];
 
-      // Calculate with full precision - don't round
-      let lat = latDeg + latMin / 60 + latSec / 3600;
-      let lng = lngDeg + lngMin / 60 + lngSec / 3600;
+      // Calculate with high precision
+      let lat = latDeg + (latMin + latSec / 60) / 60;
+      let lng = lngDeg + (lngMin + lngSec / 60) / 60;
 
       if (latDir === 'S') lat = -lat;
       if (lngDir === 'W') lng = -lng;
@@ -982,7 +982,7 @@ const GPSAreaCalculator = () => {
                           : 'text-gray-600 hover:text-gray-800'
                       }`}
                     >
-                      🗺️ Google Maps
+                      🗺️ OpenStreetMap
                     </button>
                     <button
                       onClick={() => setMapView('satellite')}
@@ -991,8 +991,8 @@ const GPSAreaCalculator = () => {
                           ? 'bg-white text-blue-600 shadow-sm'
                           : 'text-gray-600 hover:text-gray-800'
                       }`}
-                    >
-                      🌍 Google Earth
+                      >
+                      🌍 Google Satellite
                     </button>
                     <button
                       onClick={() => setMapView('terrain')}
@@ -1000,9 +1000,9 @@ const GPSAreaCalculator = () => {
                         mapView === 'terrain'
                           ? 'bg-white text-blue-600 shadow-sm'
                           : 'text-gray-600 hover:text-gray-800'
-                      }`}
-                    >
-                      ⛰️ Google Terrain
+                        }`}
+                      >
+                      ⛰️ OpenTopoMap
                     </button>
                   </div>
               <button
@@ -1078,7 +1078,7 @@ const GPSAreaCalculator = () => {
                     
                     {/* Map attribution */}
                     <div className="absolute bottom-1 right-1 text-xs text-gray-500 bg-white bg-opacity-80 px-2 py-1 rounded">
-                      {mapView === 'satellite' ? '© Google Earth' : mapView === 'terrain' ? '© Google Terrain' : '© Google Maps'}
+                      {mapView === 'satellite' ? '© Google' : mapView === 'terrain' ? '© OpenTopoMap' : '© OpenStreetMap'}
                     </div>
                     
                     {/* SVG for drawing polygon and markers */}
