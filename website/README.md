@@ -73,6 +73,283 @@ website/
 
 2. The built files will be in the `out/` directory, ready for deployment.
 
+## Google Cloud Console Setup
+
+### Prerequisites
+- Google Cloud Platform account
+- Billing enabled on your GCP project
+- Domain name (optional, for custom domain)
+
+### Step 1: Create a New Project
+
+1. **Go to Google Cloud Console**:
+   - Visit [console.cloud.google.com](https://console.cloud.google.com)
+   - Sign in with your Google account
+
+2. **Create Project**:
+   - Click on the project dropdown at the top
+   - Click "New Project"
+   - Enter project name: `bteb-result-search`
+   - Select organization (if applicable)
+   - Click "Create"
+
+3. **Select Project**:
+   - Make sure your new project is selected in the project dropdown
+
+### Step 2: Enable Required APIs
+
+1. **Enable Cloud Storage API**:
+   - Go to "APIs & Services" > "Library"
+   - Search for "Cloud Storage API"
+   - Click on it and press "Enable"
+
+2. **Enable Cloud Build API**:
+   - Search for "Cloud Build API"
+   - Click on it and press "Enable"
+
+3. **Enable App Engine API** (for App Engine deployment):
+   - Search for "App Engine Admin API"
+   - Click on it and press "Enable"
+
+### Step 3: Set Up Authentication
+
+1. **Create Service Account**:
+   - Go to "IAM & Admin" > "Service Accounts"
+   - Click "Create Service Account"
+   - Name: `bteb-deployment`
+   - Description: `Service account for BTEB website deployment`
+   - Click "Create and Continue"
+
+2. **Assign Roles**:
+   - Add these roles:
+     - `Storage Admin` (for Cloud Storage)
+     - `Cloud Build Editor` (for Cloud Build)
+     - `App Engine Admin` (for App Engine)
+   - Click "Continue" and "Done"
+
+3. **Create Key**:
+   - Click on the created service account
+   - Go to "Keys" tab
+   - Click "Add Key" > "Create new key"
+   - Choose "JSON" format
+   - Download and save the key file securely
+
+### Step 4: Configure Local Environment
+
+1. **Install Google Cloud CLI**:
+   ```bash
+   # macOS
+   brew install google-cloud-sdk
+   
+   # Windows (using Chocolatey)
+   choco install gcloudsdk
+   
+   # Linux
+   curl https://sdk.cloud.google.com | bash
+   exec -l $SHELL
+   ```
+
+2. **Authenticate**:
+   ```bash
+   gcloud auth login
+   gcloud config set project YOUR_PROJECT_ID
+   ```
+
+3. **Set up Application Default Credentials**:
+   ```bash
+   gcloud auth application-default login
+   ```
+
+### Step 5: Deploy to Google Cloud
+
+#### Option A: App Engine Deployment
+
+1. **Create app.yaml**:
+   ```yaml
+   runtime: nodejs18
+   env: standard
+   
+   handlers:
+   - url: /.*
+     script: auto
+     static_files: out/index.html
+     upload: out/index.html
+   
+   - url: /(.*)
+     static_files: out/\1
+     upload: out/(.*)
+   ```
+
+2. **Deploy**:
+   ```bash
+   cd website
+   npm run build
+   gcloud app deploy
+   ```
+
+#### Option B: Cloud Storage + Cloud CDN
+
+1. **Create Storage Bucket**:
+   ```bash
+   gsutil mb gs://your-bucket-name
+   ```
+
+2. **Upload Files**:
+   ```bash
+   cd website
+   npm run build
+   gsutil -m cp -r out/* gs://your-bucket-name
+   ```
+
+3. **Make Bucket Public**:
+   ```bash
+   gsutil iam ch allUsers:objectViewer gs://your-bucket-name
+   ```
+
+4. **Set up Cloud CDN**:
+   - Go to "Network Services" > "Cloud CDN"
+   - Create a new CDN configuration
+   - Point to your Cloud Storage bucket
+
+#### Option C: Cloud Run (Containerized)
+
+1. **Create Dockerfile**:
+   ```dockerfile
+   FROM node:18-alpine
+   WORKDIR /app
+   COPY package*.json ./
+   RUN npm ci --only=production
+   COPY . .
+   RUN npm run build
+   EXPOSE 8080
+   CMD ["npx", "serve", "out", "-p", "8080"]
+   ```
+
+2. **Build and Deploy**:
+   ```bash
+   gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/bteb-website
+   gcloud run deploy --image gcr.io/YOUR_PROJECT_ID/bteb-website --platform managed
+   ```
+
+### Step 6: Custom Domain Setup (Optional)
+
+1. **Add Custom Domain**:
+   - Go to "App Engine" > "Settings" > "Custom Domains"
+   - Click "Add Custom Domain"
+   - Follow the verification process
+
+2. **Update DNS Records**:
+   - Add the provided CNAME record to your domain's DNS settings
+   - Wait for propagation (can take up to 24 hours)
+
+### Step 7: Environment Variables (if needed)
+
+1. **Set Environment Variables**:
+   ```bash
+   # For App Engine
+   gcloud app deploy --set-env-vars="NODE_ENV=production"
+   
+   # For Cloud Run
+   gcloud run deploy --set-env-vars="NODE_ENV=production"
+   ```
+
+### Step 8: Monitoring and Logging
+
+1. **Enable Monitoring**:
+   - Go to "Monitoring" > "Overview"
+   - Set up alerts for your application
+
+2. **View Logs**:
+   - Go to "Logging" > "Logs Explorer"
+   - Filter by your service name
+
+### Step 9: Security Configuration
+
+1. **Set up IAM**:
+   - Go to "IAM & Admin" > "IAM"
+   - Review and adjust permissions as needed
+
+2. **Configure Firewall Rules**:
+   - Go to "VPC Network" > "Firewall"
+   - Create rules for your application
+
+### Step 10: Cost Optimization
+
+1. **Set up Budget Alerts**:
+   - Go to "Billing" > "Budgets & Alerts"
+   - Create a budget for your project
+
+2. **Monitor Usage**:
+   - Check "Billing" > "Reports" regularly
+   - Optimize resources based on usage
+
+### Troubleshooting
+
+#### Common Issues:
+
+1. **Authentication Errors**:
+   ```bash
+   gcloud auth login
+   gcloud config set project YOUR_PROJECT_ID
+   ```
+
+2. **Permission Denied**:
+   - Check IAM roles for your service account
+   - Ensure billing is enabled
+
+3. **Build Failures**:
+   - Check Cloud Build logs
+   - Verify all dependencies are installed
+
+4. **Deployment Issues**:
+   - Check App Engine logs
+   - Verify app.yaml configuration
+
+#### Useful Commands:
+
+```bash
+# Check current project
+gcloud config get-value project
+
+# List all projects
+gcloud projects list
+
+# Switch project
+gcloud config set project PROJECT_ID
+
+# View logs
+gcloud app logs tail -s default
+
+# Check service status
+gcloud app services list
+
+# Update service
+gcloud app deploy --version=VERSION_NUMBER
+```
+
+### Cost Estimation
+
+**App Engine (Standard Environment)**:
+- Free tier: 28 instance hours/day
+- After free tier: ~$0.05-0.10 per hour
+
+**Cloud Storage**:
+- Free tier: 5GB storage, 1GB egress/month
+- After free tier: ~$0.020 per GB storage, $0.12 per GB egress
+
+**Cloud CDN**:
+- Free tier: 1GB egress/month
+- After free tier: ~$0.08-0.12 per GB
+
+### Support Resources
+
+- [Google Cloud Documentation](https://cloud.google.com/docs)
+- [App Engine Documentation](https://cloud.google.com/appengine/docs)
+- [Cloud Storage Documentation](https://cloud.google.com/storage/docs)
+- [Cloud Run Documentation](https://cloud.google.com/run/docs)
+
+---
+
 ## Deployment on Hostinger
 
 ### Method 1: File Manager Upload

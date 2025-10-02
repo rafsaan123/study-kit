@@ -7,7 +7,11 @@
     "build": "next build --turbopack",
     "export": "next build && next export",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "deploy:app-engine": "./deploy.sh --type app-engine",
+    "deploy:cloud-storage": "./deploy.sh --type cloud-storage",
+    "deploy:cloud-run": "./deploy.sh --type cloud-run",
+    "deploy": "./deploy.sh"
   },
   "dependencies": {
     "react": "19.1.0",
